@@ -123,3 +123,16 @@ export function reviewErrorFromSql(message: string): { code: string; date?: stri
   };
   return { code: known[message] ?? "sql_error" };
 }
+
+// --------------------------------------------------------------- leaderboard
+
+const optionalId = z.coerce.number().int().positive().optional();
+
+export const leaderboardQuerySchema = z.object({
+  university_id: optionalId,
+  faculty_id: optionalId,
+  // Start year of the academic year (2026 = 2026/27), "all" for all-time; default is the current year.
+  academic_year: z.union([z.literal("all"), z.coerce.number().int().min(2000).max(2100)]).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});

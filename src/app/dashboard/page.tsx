@@ -9,9 +9,16 @@ import { LoadingState } from "@/components/loading-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { achievementTypeName, format, formatDate, t } from "@/i18n";
+import { academicYearLabel, achievementTypeName, format, formatDate, t } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
-import { getProfileSummary, getTotalPoints, listOwnSubmissions, type ProfileSummary } from "@/lib/db";
+import {
+  getCurrentAcademicYear,
+  getProfileSummary,
+  getTotalPoints,
+  getYearPoints,
+  listOwnSubmissions,
+  type ProfileSummary,
+} from "@/lib/db";
 import type { OwnSubmission } from "@/lib/types";
 
 import { LogoutButton } from "./logout-button";
@@ -46,8 +53,15 @@ async function DashboardContent() {
 
   let profile: ProfileSummary | null;
   let totalPoints: number;
+  let currentYear: number;
+  let yearPoints: number;
   try {
-    [profile, totalPoints] = await Promise.all([getProfileSummary(user.id), getTotalPoints(user.id)]);
+    [profile, totalPoints, currentYear] = await Promise.all([
+      getProfileSummary(user.id),
+      getTotalPoints(user.id),
+      getCurrentAcademicYear(),
+    ]);
+    yearPoints = await getYearPoints(user.id, currentYear);
   } catch (error) {
     console.error("load profile failed", error);
     return <ErrorState />;
@@ -66,12 +80,25 @@ async function DashboardContent() {
           </p>
         </CardHeader>
         <CardContent className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">{t.dashboard.totalPoints}</p>
-            <p className="text-4xl font-semibold text-primary-strong">
-              {totalPoints} <span className="text-base font-normal text-muted-foreground">{t.dashboard.pointsUnit}</span>
-            </p>
-          </div>
+          {/* This year's points match the default leaderboard tab; the all-time total matches "Barcha yillar". */}
+          <dl className="flex gap-6">
+            <div>
+              <dt className="text-sm text-muted-foreground">
+                {format(t.dashboard.yearPoints, { year: academicYearLabel(currentYear) })}
+              </dt>
+              <dd className="text-4xl font-semibold text-primary-strong">
+                {yearPoints}{" "}
+                <span className="text-base font-normal text-muted-foreground">{t.dashboard.pointsUnit}</span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">{t.dashboard.allTimePoints}</dt>
+              <dd className="text-4xl font-semibold">
+                {totalPoints}{" "}
+                <span className="text-base font-normal text-muted-foreground">{t.dashboard.pointsUnit}</span>
+              </dd>
+            </div>
+          </dl>
           {profile.role === "student" ? (
             <Button asChild size="lg">
               <Link href="/achievements/new">

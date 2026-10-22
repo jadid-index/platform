@@ -1,23 +1,222 @@
+import { Info } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 
+import { ErrorState } from "@/components/error-state";
+import { LeaderboardShell } from "@/components/leaderboard/leaderboard-shell";
+import { LoadingState } from "@/components/loading-state";
+import { StudentAvatar } from "@/components/student-avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { t } from "@/i18n";
+import { Card, CardContent } from "@/components/ui/card";
+import { academicYearLabel, format, t } from "@/i18n";
+import { getCurrentUser } from "@/lib/auth";
+import { getDefaultLeaderboard, getLeaderboard, getProfileAccess, getUniversitiesCached } from "@/lib/db";
+import type { Leaderboard, LeaderboardYear, University } from "@/lib/types";
 
-export default function HomePage() {
+const PAGE_SIZE = 50;
+
+type Params = { year: LeaderboardYear | null; universityId?: number; facultyId?: number; limit: number };
+
+function parseParams(sp: Record<string, string | string[] | undefined>): Params {
+  const one = (key: string) => (typeof sp[key] === "string" ? (sp[key] as string) : undefined);
+  const int = (key: string) => {
+    const n = Number(one(key));
+    return Number.isInteger(n) && n > 0 ? n : undefined;
+  };
+  const year = one("year");
+  return {
+    year: year === "all" ? "all" : (int("year") ?? null),
+    universityId: int("university"),
+    facultyId: int("faculty"),
+    limit: Math.min(int("limit") ?? PAGE_SIZE, 1000),
+  };
+}
+
+// Public home page: the leaderboard. No login needed.
+export default function HomePage({ searchParams }: PageProps<"/">) {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-12 text-center">
-      <div className="grid gap-2">
-        <h1 className="text-3xl font-semibold text-primary-strong">{t.common.appName}</h1>
-        <p className="text-muted-foreground">{t.home.tagline}</p>
-      </div>
-      <div className="grid w-full max-w-xs gap-3">
-        <Button asChild size="lg">
-          <Link href="/signup">{t.home.signup}</Link>
-        </Button>
-        <Button asChild size="lg" variant="outline">
-          <Link href="/login">{t.home.login}</Link>
-        </Button>
-      </div>
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-primary-strong">{t.common.appName}</h1>
+          <p className="text-sm text-muted-foreground">{t.home.tagline}</p>
+        </div>
+        <Suspense fallback={null}>
+          <AuthLinks />
+        </Suspense>
+      </header>
+      <Suspense fallback={<LoadingState />}>
+        <LeaderboardSection searchParams={searchParams} />
+      </Suspense>
     </main>
+  );
+}
+
+async function AuthLinks() {
+  const user = await getCurrentUser();
+  if (user) {
+    return (
+      <Button asChild variant="outline" size="lg">
+        <Link href="/dashboard">{t.home.dashboard}</Link>
+      </Button>
+    );
+  }
+  return (
+    <div className="flex gap-2">
+      <Button asChild variant="outline" size="lg">
+        <Link href="/login">{t.home.login}</Link>
+      </Button>
+      <Button asChild size="lg">
+        <Link href="/signup">{t.home.signup}</Link>
+      </Button>
+    </div>
+  );
+}
+
+async function LeaderboardSection({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
+  const params = parseParams(await searchParams);
+  const filters = { university_id: params.universityId, faculty_id: params.facultyId };
+
+  let board: Leaderboard;
+  let universities: University[];
+  try {
+    [board, universities] = await Promise.all([
+      params.year === null ? getDefaultLeaderboard(filters) : getLeaderboard({ ...filters, year: params.year }),
+      getUniversitiesCached(),
+    ]);
+  } catch (error) {
+    console.error("load leaderboard failed", error);
+    return <ErrorState message={t.leaderboard.error} />;
+  }
+
+  const filtered = Boolean(filters.university_id || filters.faculty_id);
+  const rows = board.rows.slice(0, params.limit);
+
+  return (
+    <LeaderboardShell
+      years={board.available_years}
+      year={board.academic_year}
+      universities={universities}
+      universityId={params.universityId}
+      facultyId={params.facultyId}
+    >
+      <div className="grid gap-3">
+        {board.fallback_from_year !== null ? (
+          <Alert className="border-status-pending-foreground/30 bg-status-pending text-status-pending-foreground">
+            <Info aria-hidden />
+            <AlertDescription className="text-status-pending-foreground">{t.leaderboard.fallbackNotice}</AlertDescription>
+          </Alert>
+        ) : null}
+        <Suspense fallback={null}>
+          <MyRank board={board} filtered={filtered} />
+        </Suspense>
+
+        {rows.length === 0 ? (
+          <EmptyState board={board} filtered={filtered} />
+        ) : (
+          <ol className="grid gap-2">
+            {rows.map((row) => (
+              <li key={row.student_id}>
+                <Link
+                  href={`/students/${row.student_id}`}
+                  className="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <Card className="py-3 transition-colors hover:bg-primary-soft">
+                    <CardContent className="flex items-center gap-3 px-3">
+                      <span
+                        className={
+                          row.rank <= 3
+                            ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                            : "flex size-8 shrink-0 items-center justify-center text-sm font-semibold text-muted-foreground"
+                        }
+                        aria-label={format(t.leaderboard.rank, { rank: row.rank })}
+                      >
+                        {row.rank}
+                      </span>
+                      <StudentAvatar name={row.full_name} url={row.photo_url} />
+                      <div className="grid min-w-0 flex-1">
+                        <span className="truncate font-medium">{row.full_name}</span>
+                        {row.faculty ? (
+                          <span className="truncate text-sm text-muted-foreground">{row.faculty}</span>
+                        ) : null}
+                      </div>
+                      <span className="shrink-0 text-right font-semibold text-primary-strong">
+                        {format(t.leaderboard.points, { points: row.total_points })}
+                      </span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {board.rows.length > rows.length ? (
+          <Button asChild variant="outline" size="lg">
+            <Link href={moreHref(params, rows.length + PAGE_SIZE)} scroll={false}>
+              {t.leaderboard.showMore}
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+    </LeaderboardShell>
+  );
+}
+
+function moreHref(params: Params, limit: number): string {
+  const qs = new URLSearchParams();
+  if (params.year !== null) qs.set("year", String(params.year));
+  if (params.universityId) qs.set("university", String(params.universityId));
+  if (params.facultyId) qs.set("faculty", String(params.facultyId));
+  qs.set("limit", String(limit));
+  return `/?${qs}`;
+}
+
+function EmptyState({ board, filtered }: { board: Leaderboard; filtered: boolean }) {
+  const text = filtered
+    ? t.leaderboard.emptyFiltered
+    : board.academic_year === "all"
+      ? t.leaderboard.emptyAll
+      : format(t.leaderboard.emptyYear, { year: academicYearLabel(board.academic_year) });
+  return (
+    <Card>
+      <CardContent className="grid gap-1 py-2 text-center">
+        <p>{text}</p>
+        {!filtered && board.academic_year !== "all" ? (
+          <p className="text-sm text-muted-foreground">{t.leaderboard.emptyYearHint}</p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+// The signed-in student's own place in the list being shown (same year and filters).
+async function MyRank({ board, filtered }: { board: Leaderboard; filtered: boolean }) {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const access = await getProfileAccess(user.id).catch(() => null);
+  if (!access || access.role !== "student") return null;
+
+  let text: string;
+  const mine = board.rows.find((r) => r.student_id === user.id);
+  if (mine) {
+    text = format(t.leaderboard.myRank, { rank: mine.rank, points: mine.total_points });
+  } else {
+    // Not in the filtered list: show the place without filters, if the student has points this period.
+    const unfiltered = filtered
+      ? await getLeaderboard({ year: board.academic_year }).catch(() => null)
+      : null;
+    const overall = unfiltered?.rows.find((r) => r.student_id === user.id);
+    text = overall
+      ? format(t.leaderboard.myRankFiltered, { rank: overall.rank, points: overall.total_points })
+      : t.leaderboard.myRankNone;
+  }
+
+  return (
+    <div className="rounded-lg border border-primary bg-primary-soft px-3 py-2 text-sm" aria-live="polite">
+      <span className="font-semibold">{t.leaderboard.myRankTitle}: </span>
+      {text}
+    </div>
   );
 }

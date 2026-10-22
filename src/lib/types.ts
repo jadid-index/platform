@@ -81,3 +81,54 @@ export type PointsPreview = {
   cap: number;
   awarded: number; // what approval would award after the yearly cap
 };
+
+// ------------------------------------------------------------- leaderboard
+// Public data only (CLAUDE.md rule 5): name, faculty, score, approved work titles, photo.
+
+export type LeaderboardYear = number | "all"; // start year (2026 = 2026/27) or all-time
+
+export type LeaderboardFilters = {
+  year: LeaderboardYear;
+  university_id?: number;
+  faculty_id?: number;
+};
+
+export type LeaderboardRow = {
+  rank: number;
+  student_id: string;
+  full_name: string;
+  university: string;
+  faculty: string | null;
+  photo_url: string | null;
+  total_points: number;
+  approved_count: number;
+};
+
+export type Leaderboard = {
+  academic_year: LeaderboardYear;
+  current_academic_year: number;
+  available_years: number[]; // newest first, always includes the current year
+  rows: LeaderboardRow[]; // every ranked row for these filters
+  // Set when the default view fell back from an empty current year to the most recent year with data.
+  fallback_from_year: number | null;
+};
+
+export type PublicWork = {
+  title: string;
+  type_id: number | null;
+  type_name: string;
+  level: RubricRow["level"];
+  result: RubricRow["result"];
+  points_awarded: number;
+  achievement_date: string;
+};
+
+export type PublicStudent = {
+  student_id: string;
+  full_name: string;
+  university: string;
+  faculty: string | null;
+  photo_url: string | null;
+  total_points: number;
+  works: PublicWork[];
+};

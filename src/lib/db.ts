@@ -1,17 +1,25 @@
 import "server-only";
 
+import { cacheLife, cacheTag } from "next/cache";
+
 import { getAdminClient } from "@/lib/supabase/admin";
 import type {
   AchievementType,
+  Leaderboard,
+  LeaderboardFilters,
+  LeaderboardRow,
+  LeaderboardYear,
   Meta,
   OwnSubmission,
   PointsPreview,
+  PublicStudent,
+  PublicWork,
   ReviewQueueItem,
   RubricRow,
   SubmissionForReview,
   University,
 } from "@/lib/types";
-import type { Level, ProfileBody, Result } from "@/lib/validation";
+import { todayInTashkent, type Level, type ProfileBody, type Result } from "@/lib/validation";
 
 // The one server-side module that talks to the database and storage. Route handlers and server components
 // call these functions; nothing else imports the admin client.
@@ -452,6 +460,162 @@ export async function rejectSubmission(submissionId: string, reviewerId: string,
   if (!error) return { ok: true };
   if (error.code === "P0001") return { ok: false, message: error.message };
   throw error;
+}
+
+// ------------------------------------------------------------- leaderboard
+
+// Cached leaderboard reads use "use cache: remote": on Vercel that is the shared runtime cache, so every
+// function instance reads the same entries (plain "use cache" is in-memory per instance). Approvals call
+// revalidateTag(LEADERBOARD_TAG) to purge them; otherwise entries refresh after about 30 seconds.
+// Without a remote cache handler (local dev, self-hosting) Next falls back to the in-memory cache.
+export const LEADERBOARD_TAG = "leaderboard";
+const LEADERBOARD_CACHE = { stale: 30, revalidate: 30, expire: 300 };
+
+// Academic year (start year) of today in Uzbekistan, from the SQL academic_year() function.
+export async function getCurrentAcademicYear(): Promise<number> {
+  const { data, error } = await getAdminClient().rpc("academic_year", { d: todayInTashkent() });
+  if (error) throw error;
+  return data as number;
+}
+
+type LeaderboardViewRow = {
+  student_id: string;
+  full_name: string;
+  photo_path: string | null;
+  university: string;
+  faculty: string | null;
+  total_points: number;
+  approved_count: number;
+};
+
+function avatarUrl(path: string | null): string | null {
+  return path ? getAdminClient().storage.from("avatars").getPublicUrl(path).data.publicUrl : null;
+}
+
+// Every ranked row for the filters. year = null means the current academic year.
+// Rank is computed after filtering: points descending, ties go to the earlier last approval.
+// Students with no approved points are left out (leaderboard_by_year already omits them).
+export async function getLeaderboard(
+  filters: Omit<LeaderboardFilters, "year"> & { year: LeaderboardYear | null },
+): Promise<Leaderboard> {
+  "use cache: remote";
+  cacheTag(LEADERBOARD_TAG);
+  cacheLife(LEADERBOARD_CACHE);
+
+  const db = getAdminClient();
+  const currentYear = await getCurrentAcademicYear();
+  const year = filters.year ?? currentYear;
+
+  let query = db
+    .from(year === "all" ? "leaderboard" : "leaderboard_by_year")
+    .select("student_id, full_name, photo_path, university, faculty, total_points, approved_count, last_approved_at")
+    .gt("total_points", 0);
+  if (year !== "all") query = query.eq("academic_year", year);
+  if (filters.university_id) query = query.eq("university_id", filters.university_id);
+  if (filters.faculty_id) query = query.eq("faculty_id", filters.faculty_id);
+
+  const [list, years] = await Promise.all([
+    query
+      .order("total_points", { ascending: false })
+      .order("last_approved_at", { ascending: true })
+      .order("student_id", { ascending: true }),
+    db.from("leaderboard_by_year").select("academic_year"),
+  ]);
+  if (list.error) throw list.error;
+  if (years.error) throw years.error;
+
+  const rows: LeaderboardRow[] = ((list.data ?? []) as LeaderboardViewRow[]).map((r, i) => ({
+    rank: i + 1,
+    student_id: r.student_id,
+    full_name: r.full_name,
+    university: r.university,
+    faculty: r.faculty,
+    photo_url: avatarUrl(r.photo_path),
+    total_points: r.total_points,
+    approved_count: r.approved_count,
+  }));
+  const available = new Set<number>([currentYear, ...(years.data ?? []).map((y) => y.academic_year as number)]);
+
+  return {
+    academic_year: year,
+    current_academic_year: currentYear,
+    available_years: [...available].sort((a, b) => b - a),
+    rows,
+    fallback_from_year: null,
+  };
+}
+
+// The default view: the current academic year, or, while it has no entries for these filters,
+// the most recent earlier year that has some (flagged with fallback_from_year).
+export async function getDefaultLeaderboard(filters: Omit<LeaderboardFilters, "year">): Promise<Leaderboard> {
+  const current = await getLeaderboard({ ...filters, year: null });
+  if (current.rows.length > 0) return current;
+  for (const year of current.available_years) {
+    if (year >= current.current_academic_year) continue;
+    const earlier = await getLeaderboard({ ...filters, year });
+    if (earlier.rows.length > 0) return { ...earlier, fallback_from_year: current.current_academic_year };
+  }
+  return current;
+}
+
+// Public profile: approved works only, from public_works. Never includes files or file paths.
+// Returns null for anyone who is not an active student on the leaderboard.
+export async function getPublicStudent(studentId: string): Promise<PublicStudent | null> {
+  "use cache: remote";
+  cacheTag(LEADERBOARD_TAG);
+  cacheLife(LEADERBOARD_CACHE);
+
+  const db = getAdminClient();
+  const [student, works, types] = await Promise.all([
+    db
+      .from("leaderboard")
+      .select("student_id, full_name, photo_path, university, faculty, total_points")
+      .eq("student_id", studentId)
+      .maybeSingle(),
+    db
+      .from("public_works")
+      .select("title, type_name, level, result, points_awarded, achievement_date")
+      .eq("student_id", studentId)
+      .order("achievement_date", { ascending: false }),
+    db.from("achievement_types").select("id, name"),
+  ]);
+  if (student.error) throw student.error;
+  if (works.error) throw works.error;
+  if (types.error) throw types.error;
+  if (!student.data) return null;
+
+  const typeIds = new Map((types.data ?? []).map((x) => [x.name as string, x.id as number]));
+  return {
+    student_id: student.data.student_id,
+    full_name: student.data.full_name,
+    university: student.data.university,
+    faculty: student.data.faculty,
+    photo_url: avatarUrl(student.data.photo_path),
+    total_points: student.data.total_points,
+    works: ((works.data ?? []) as Omit<PublicWork, "type_id">[]).map((w) => ({
+      ...w,
+      type_id: typeIds.get(w.type_name) ?? null,
+    })),
+  };
+}
+
+// Reference data for the public filters; changes rarely.
+export async function getUniversitiesCached(): Promise<University[]> {
+  "use cache";
+  cacheLife("minutes");
+  return listUniversitiesWithFaculties();
+}
+
+// The student's own points in one academic year (dashboard). Not cached: it is per user.
+export async function getYearPoints(studentId: string, academicYear: number): Promise<number> {
+  const { data, error } = await getAdminClient()
+    .from("leaderboard_by_year")
+    .select("total_points")
+    .eq("student_id", studentId)
+    .eq("academic_year", academicYear)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.total_points ?? 0;
 }
 
 // ---------------------------------------------------------------- storage

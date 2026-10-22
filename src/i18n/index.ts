@@ -38,3 +38,8 @@ export function formatAge(value: string, now: number = Date.now()): string {
   if (hours < 24) return format(t.review.ageHours, { n: hours });
   return format(t.review.ageDays, { n: Math.floor(hours / 24) });
 }
+
+// Academic year start year -> "2026/27".
+export function academicYearLabel(year: number): string {
+  return `${year}/${String((year + 1) % 100).padStart(2, "0")}`;
+}

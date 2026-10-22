@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { format, formatDate, t } from "@/i18n";
+import { academicYearLabel, format, formatDate, t } from "@/i18n";
 import type { AchievementType, PointsPreview, RubricRow } from "@/lib/types";
 import { REJECTION_REASON_MAX_LENGTH } from "@/lib/validation";
 
@@ -39,10 +39,6 @@ function errorText(body: { error?: string; date?: string }): string {
     default:
       return t.common.genericError;
   }
-}
-
-function academicYearLabel(year: number): string {
-  return `${year}/${String((year + 1) % 100).padStart(2, "0")}`;
 }
 
 export function ReviewPanel({
