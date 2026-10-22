@@ -12,7 +12,7 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
 - Next.js (App Router, TypeScript), Tailwind, a component library (shadcn/ui).
 - Supabase: Postgres, Auth, Storage. Hosted for now; the team confirmed hosting abroad is acceptable for the pilot.
   Keep it portable, because a move to local hosting may be needed later (see "Portability").
-- Deploy: Vercel, imported from GitLab. Environment variables live in Vercel and Supabase, never in the repo.
+- Deploy: Vercel, imported from GitHub. Environment variables live in Vercel and Supabase, never in the repo.
 - Put the schema in `supabase/migrations/` as the first migration (copy of `docs/schema.sql`), then the seed.
 
 ## Rules that must never be broken
@@ -21,8 +21,9 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
    which applies the yearly category cap. Never compute or store points anywhere else.
 2. **AI never decides anything.** It extracts fields and suggests values. The student confirms the form, and a human
    reviewer approves or rejects. AI output is saved in `ai_extraction` / `ai_flags` for the reviewer to see.
-3. **The browser never writes to the database.** All writes go through server route handlers using the service-role key.
-   The service-role key and the AI API key exist only on the server and must never be imported into client code.
+3. **The browser never writes to the database.** All writes go through server route handlers using the Supabase secret key (`sb_secret_...`).
+   The secret key and the AI API key exist only on the server and must never be imported into client code.
+   The browser uses only the publishable key (`sb_publishable_...`). Do not use the legacy anon / service_role keys.
 4. **Uploaded proof files are private.** Store them in the private `proofs` bucket and give reviewers short-lived
    signed URLs. Never show a file or a file URL on the leaderboard or on a public profile.
 5. **Public data is limited** to name, faculty, score, approved work titles and (if uploaded) the profile photo.
@@ -60,7 +61,7 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
 - Validate every request body on the server (zod), whatever the form already checks.
 - Keep scope tight. For Thursday, cut these first: photo and bio, appeal comment, extra recognition checks.
   Do not build: blockchain, plagiarism detection, quality scoring, admin screens, notifications.
-- Commit small and often. Open merge requests against `main`; during the Thursday sprint pushing directly is fine.
+- Commit small and often. Open pull requests against `main`; during the Thursday sprint pushing directly is fine.
 
 ## Portability (so a move to local hosting stays cheap)
 

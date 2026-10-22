@@ -5,7 +5,7 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
 
 ## 0. Assumptions
 
-- Supabase (Postgres, Auth, Storage) and Next.js route handlers. The service-role key is used
+- Supabase (Postgres, Auth, Storage) and Next.js route handlers. The secret key (`sb_secret_...`, formerly service_role) is used
   only on the server. If you are not on Supabase, replace `auth.users`, `auth.uid()` and the RLS block.
 - Files: `schema.sql`, then `seed.sql` (generated from the v0.3 rubric workbook).
 - Sign-up is limited to verified university emails. Allowed domains live in `allowed_email_domains`
@@ -38,6 +38,13 @@ The points preview on the review screen is: rubric points for the chosen combina
 already has in that category and academic year, and points that would be awarded after the cap.
 
 ## 2. Validation on `POST /api/submissions`
+
+Upload flow as built (Vercel rejects request bodies over 4.5 MB, so files never go through the API body):
+1. `POST /api/submissions/upload-url` checks the student, declared size and type, picks the submission id and returns a one-time upload URL for `proofs/{student_id}/{submission_id}/{filename}`.
+2. The browser uploads the file straight to that private URL.
+3. `POST /api/submissions` downloads the stored file and runs the checks below, including the real file signature and SHA-256. If any check fails it deletes the stored file. Otherwise it inserts the submission as pending.
+`POST /api/extract` works on the stored file (`{ submission_id, path }`), not on an uploaded body.
+Known gap: a file uploaded in step 2 with no step 3 stays in the bucket; clean up later.
 
 1. Profile must be `active`.
 2. File: PDF, JPG or PNG, 10 MB or less. Compute SHA-256 on the server. A live duplicate (unique index) returns a generic "already submitted" message.
