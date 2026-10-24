@@ -45,6 +45,7 @@ export const uz = {
   form: {
     fullName: "Toʻliq ism-sharif",
     fullNamePlaceholder: "Familiya Ism Otasining ismi",
+    fullNameHint: "Bu ism reytingda hammaga koʻrinadi.",
     email: "Universitet e-pochtasi",
     emailPlaceholder: "ism@iiau.uz",
     password: "Parol",
@@ -86,6 +87,16 @@ export const uz = {
     submitting: "Kirilmoqda…",
     noAccount: "Hisobingiz yoʻqmi?",
     signupLink: "Roʻyxatdan oʻtish",
+  },
+  auth: {
+    google: "Google orqali davom etish",
+    googleRedirecting: "Googlega yoʻnaltirilmoqda…",
+    or: "yoki",
+    codeErrorTitle: "Kirish amalga oshmadi",
+    codeErrorBody:
+      "Kirish havolasi yaroqsiz, muddati oʻtgan yoki bekor qilingan. Qaytadan kirib koʻring.",
+    toLogin: "Kirish sahifasiga",
+    toSignup: "Roʻyxatdan oʻtish",
   },
   onboarding: {
     title: "Profilni yakunlash",

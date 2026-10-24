@@ -28,6 +28,8 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
    signed URLs. Never show a file or a file URL on the leaderboard or on a public profile.
 5. **Public data is limited** to name, faculty, score, approved work titles and (if uploaded) the profile photo.
    That is exactly what the consent notice promises. Do not add anything else to public views.
+   Google sign-in must not import a profile photo (no avatar_url), and the name from Google is only a
+   suggestion that the student confirms, because it is shown publicly.
 6. **Pilot sign-up is open: any email address, no email verification** (team decision, 24 Oct, temporary).
    Identity verification (university email, HEMIS / student ID login) comes after the pilot. Keep `profiles.status`,
    `allowed_email_domains` and the student-review idea in the schema, but do not enforce them now, and do not

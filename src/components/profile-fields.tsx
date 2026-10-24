@@ -62,7 +62,7 @@ export function ProfileFields({
 
   return (
     <>
-      <Field id="fullName" label={t.form.fullName} error={errors.fullName}>
+      <Field id="fullName" label={t.form.fullName} hint={t.form.fullNameHint} error={errors.fullName}>
         <Input
           id="fullName"
           name="fullName"
@@ -72,7 +72,7 @@ export function ProfileFields({
           value={values.fullName}
           disabled={disabled}
           aria-invalid={!!errors.fullName}
-          aria-describedby={errors.fullName ? "fullName-message" : undefined}
+          aria-describedby="fullName-message"
           onChange={(e) => set("fullName", e.target.value)}
         />
       </Field>

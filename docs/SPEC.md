@@ -7,6 +7,8 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
 
 - Supabase (Postgres, Auth, Storage) and Next.js route handlers. The secret key (`sb_secret_...`, formerly service_role) is used
   only on the server. If you are not on Supabase, replace `auth.users`, `auth.uid()` and the RLS block.
+- Sign-in: email + password, and "Continue with Google" (OAuth, PKCE). Google users have no profile row until
+  they finish `/onboarding` (name, university, faculty, course, consent), which calls `POST /api/profile`.
 - Files: `schema.sql`, then `seed.sql` (generated from the v0.3 rubric workbook).
 - Pilot sign-up is open: any email, no email verification (team decision, 24 Oct, temporary). The
   `allowed_email_domains` table (seeded with `iiau.uz`) and `profiles.status` stay in the schema for the later
@@ -172,6 +174,13 @@ Still open:
    also submit something dated since 1 September.
 2. Add the profile photo to the list of public data in the consent notice.
 3. Later: how identity verification (university email, HEMIS / student ID) should show on profiles.
+
+Known risks (accepted for the pilot):
+
+- Identity linking: Supabase links a Google sign-in to an existing account with the same email if that account
+  is confirmed. With "Confirm email" off every password sign-up counts as confirmed, so someone who registers
+  another person's Gmail address with a password keeps password access after the real owner signs in with
+  Google. Revisit with identity verification after the pilot.
 
 ## 7. Build order (Mon night to Thursday)
 

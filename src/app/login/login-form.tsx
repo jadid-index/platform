@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Field } from "@/components/field";
+import { GoogleButton, OrDivider } from "@/components/google-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +60,9 @@ export function LoginForm() {
 
   return (
     <form className="grid gap-5" noValidate onSubmit={onSubmit}>
+      <GoogleButton disabled={submitting} />
+      <OrDivider />
+
       <Field id="email" label={t.form.email}>
         <Input
           id="email"

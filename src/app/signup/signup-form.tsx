@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Field } from "@/components/field";
+import { GoogleButton, OrDivider } from "@/components/google-button";
 import {
   emptyProfileValues,
   ProfileFields,
@@ -103,6 +104,9 @@ export function SignupForm({ universities }: { universities: University[] }) {
 
   return (
     <form className="grid gap-5" noValidate onSubmit={onSubmit}>
+      <GoogleButton disabled={submitting} />
+      <OrDivider />
+
       <Field id="email" label={t.form.email} error={errors.email}>
         <Input
           id="email"

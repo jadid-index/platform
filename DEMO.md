@@ -19,6 +19,8 @@ Live URL: `https://<your-project>.vercel.app` (fill in after the first deploy).
 2. **Sign-up**: tap "Roʻyxatdan oʻtish".
    - Pilot sign-up is open: any email works, no confirmation email is sent.
    - Fill the form, show that the button stays disabled until consent is ticked. You land on the dashboard.
+   - Or tap "Google orqali davom etish": after Google, onboarding asks for name (prefilled, editable),
+     faculty, course and consent, then the dashboard. No Google photo is imported.
 3. **Add achievement**: "Yutuq qoʻshish".
    - Pick Olympiad, National, Winner and show the "Oldindan koʻrish" points (16).
    - Switch to Journal article: the labels change and the DOI field becomes required.
@@ -38,6 +40,8 @@ Talking point for AI: the "AI baholash" panel is a placeholder. AI will only pre
 - [ ] Home page loads without login, tabs and filters work, a student page opens.
 - [ ] Sign-up with any address (for example `@gmail.com`) lands on the dashboard with no email sent
       ("Confirm email" is off in Supabase Auth).
+- [ ] "Google orqali davom etish" on the live domain returns to the live domain (not localhost), a new Google
+      user lands on onboarding, a returning one on the dashboard. Cancelling on Google's screen shows the error page.
 - [ ] Add achievement with a 9 MB PDF works (direct upload to storage, not through Vercel).
 - [ ] A `.docx` renamed to `.pdf` is refused.
 - [ ] The same file submitted twice shows "Bu hujjat allaqachon yuborilgan."
