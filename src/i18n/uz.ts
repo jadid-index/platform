@@ -69,7 +69,7 @@ export const uz = {
   },
   signup: {
     title: "Roʻyxatdan oʻtish",
-    subtitle: "Universitet e-pochtangiz bilan hisob yarating.",
+    subtitle: "E-pochtangiz bilan hisob yarating.",
     submit: "Roʻyxatdan oʻtish",
     submitting: "Yuborilmoqda…",
     haveAccount: "Hisobingiz bormi?",
@@ -81,7 +81,7 @@ export const uz = {
   },
   login: {
     title: "Kirish",
-    subtitle: "Universitet e-pochtangiz va parolingizni kiriting.",
+    subtitle: "E-pochtangiz va parolingizni kiriting.",
     submit: "Kirish",
     submitting: "Kirilmoqda…",
     noAccount: "Hisobingiz yoʻqmi?",
@@ -89,7 +89,7 @@ export const uz = {
   },
   onboarding: {
     title: "Profilni yakunlash",
-    subtitle: "E-pochtangiz tasdiqlandi. Maʼlumotlaringizni tekshiring va profilni yarating.",
+    subtitle: "Maʼlumotlaringizni tekshiring va profilni yarating.",
     submit: "Profilni yaratish",
     submitting: "Saqlanmoqda…",
   },
@@ -369,8 +369,6 @@ export const uz = {
     required: "Bu maydonni toʻldiring.",
     fullNameInvalid: "Toʻliq ism-sharifingizni kiriting (kamida 3 ta harf).",
     emailInvalid: "Toʻgʻri e-pochta manzilini kiriting.",
-    domainNotAllowed:
-      "Bu e-pochta domeni ruxsat etilmagan. Universitet bergan e-pochtadan foydalaning (masalan, ism@iiau.uz).",
     passwordTooShort: "Parol kamida 8 ta belgidan iborat boʻlishi kerak.",
     invalidCredentials: "E-pochta yoki parol notoʻgʻri.",
     emailNotConfirmed: "E-pochtangiz hali tasdiqlanmagan. Pochtangizdagi havolani bosing.",

@@ -18,8 +18,6 @@ import type { University } from "@/lib/types";
 
 const API_ERRORS: Record<string, string> = {
   unauthorized: t.errors.unauthorized,
-  email_not_verified: t.errors.emailNotConfirmed,
-  domain_not_allowed: t.errors.domainNotAllowed,
   consent_outdated: t.errors.consentOutdated,
   faculty_mismatch: t.errors.facultyMismatch,
 };

@@ -6,8 +6,6 @@ import { CONSENT_VERSION } from "@/lib/consent";
 
 export const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
 
-export const checkEmailBodySchema = z.object({ email: emailSchema });
-
 export const PASSWORD_MIN_LENGTH = 8;
 
 export const profileBodySchema = z.object({
@@ -19,10 +17,6 @@ export const profileBodySchema = z.object({
 });
 
 export type ProfileBody = z.infer<typeof profileBodySchema>;
-
-export function emailDomain(email: string): string {
-  return email.trim().toLowerCase().split("@").pop() ?? "";
-}
 
 // ---------------------------------------------------------------- submissions
 

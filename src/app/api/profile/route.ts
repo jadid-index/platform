@@ -5,13 +5,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { createStudentProfile, facultyBelongsToUniversity } from "@/lib/db";
 import { profileBodySchema } from "@/lib/validation";
 
-// Creates the signed-in user's student profile after email verification.
+// Creates the signed-in user's student profile. Pilot: no email-domain or verification check (CLAUDE.md rule 6).
 // Body: { full_name, university_id, faculty_id, course, consent_version }.
 // consent_at is set here; role and status are never taken from the body.
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return apiError(401, "unauthorized");
-  if (!user.email_confirmed_at) return apiError(403, "email_not_verified");
 
   const body = await readJson(request);
   const parsed = profileBodySchema.safeParse(body);
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
 
     const result = await createStudentProfile(user.id, parsed.data);
     if (!result.ok) {
-      return result.reason === "exists" ? apiError(409, "profile_exists") : apiError(403, result.reason);
+      return apiError(409, "profile_exists");
     }
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (error) {

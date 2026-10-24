@@ -28,8 +28,12 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
    signed URLs. Never show a file or a file URL on the leaderboard or on a public profile.
 5. **Public data is limited** to name, faculty, score, approved work titles and (if uploaded) the profile photo.
    That is exactly what the consent notice promises. Do not add anything else to public views.
-6. **Sign-up needs a verified email on an allowed domain** (`allowed_email_domains`, currently `iiau.uz`).
-   A database trigger enforces it. Do not bypass it, and keep email verification switched on in Supabase Auth.
+6. **Pilot sign-up is open: any email address, no email verification** (team decision, 24 Oct, temporary).
+   Identity verification (university email, HEMIS / student ID login) comes after the pilot. Keep `profiles.status`,
+   `allowed_email_domains` and the student-review idea in the schema, but do not enforce them now, and do not
+   build features that assume emails are real or deliverable (no email notifications; password reset by email
+   works only if SMTP is configured). A profile with status other than 'active' is hidden from the leaderboard;
+   that is the manual kill switch for fake accounts.
 7. **A rejection needs a reason.** Reviewers cannot review their own submissions.
 8. **Never commit secrets.** `.env*` stays in `.gitignore`; keep `.env.example` with variable names only.
 9. **Never send student profile data to the AI model.** `/api/extract` sends the document and the prompt only.
@@ -81,5 +85,5 @@ Fill these in after the project is scaffolded:
 ## Open items (do not guess, ask the team)
 
 - The exact consent notice text (Uzbek, Russian) and its version string.
-- Whether `student.iiau.uz` or other subdomains also need to be allowed.
+- Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (accounts are created by hand in the database for now).

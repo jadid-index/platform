@@ -17,9 +17,8 @@ Live URL: `https://<your-project>.vercel.app` (fill in after the first deploy).
 1. **Leaderboard** (logged out): open the live URL. Show the year tabs, "Barcha yillar", the faculty filter,
    and open one student to show their approved works. Point out: no files are public, only titles and points.
 2. **Sign-up**: tap "Roʻyxatdan oʻtish".
-   - Try `test@gmail.com` and show the domain message.
-   - Use the `@iiau.uz` address, fill the form, show that the button stays disabled until consent is ticked.
-   - Open the email, tap the link, tap "Profilni yaratish" on the onboarding screen. You land on the dashboard.
+   - Pilot sign-up is open: any email works, no confirmation email is sent.
+   - Fill the form, show that the button stays disabled until consent is ticked. You land on the dashboard.
 3. **Add achievement**: "Yutuq qoʻshish".
    - Pick Olympiad, National, Winner and show the "Oldindan koʻrish" points (16).
    - Switch to Journal article: the labels change and the DOI field becomes required.
@@ -37,9 +36,8 @@ Talking point for AI: the "AI baholash" panel is a placeholder. AI will only pre
 
 ### Desktop
 - [ ] Home page loads without login, tabs and filters work, a student page opens.
-- [ ] Sign-up with a non-`iiau.uz` address is refused before any email is sent.
-- [ ] The confirmation link opens `/auth/confirm` on the live domain (not localhost) and lands on onboarding.
-- [ ] Opening the confirmation link on a different device than the one used to sign up also works.
+- [ ] Sign-up with any address (for example `@gmail.com`) lands on the dashboard with no email sent
+      ("Confirm email" is off in Supabase Auth).
 - [ ] Add achievement with a 9 MB PDF works (direct upload to storage, not through Vercel).
 - [ ] A `.docx` renamed to `.pdf` is refused.
 - [ ] The same file submitted twice shows "Bu hujjat allaqachon yuborilgan."

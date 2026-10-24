@@ -34,16 +34,6 @@ export async function listUniversitiesWithFaculties(): Promise<University[]> {
   return data ?? [];
 }
 
-export async function isEmailDomainAllowed(domain: string): Promise<boolean> {
-  const { data, error } = await getAdminClient()
-    .from("allowed_email_domains")
-    .select("domain")
-    .eq("domain", domain.toLowerCase())
-    .maybeSingle();
-  if (error) throw error;
-  return data !== null;
-}
-
 export async function facultyBelongsToUniversity(facultyId: number, universityId: number): Promise<boolean> {
   const { data, error } = await getAdminClient()
     .from("faculties")
@@ -89,11 +79,9 @@ export async function getProfileSummary(userId: string): Promise<ProfileSummary 
   };
 }
 
-export type CreateProfileResult =
-  | { ok: true }
-  | { ok: false; reason: "exists" | "email_not_verified" | "domain_not_allowed" };
+export type CreateProfileResult = { ok: true } | { ok: false; reason: "exists" };
 
-// Creates a student profile. The enforce_student_email trigger makes the final domain and verification check.
+// Creates a student profile. Pilot sign-up is open, so any email is accepted (CLAUDE.md rule 6).
 export async function createStudentProfile(userId: string, body: ProfileBody): Promise<CreateProfileResult> {
   const { error } = await getAdminClient().from("profiles").insert({
     id: userId,
@@ -107,8 +95,6 @@ export async function createStudentProfile(userId: string, body: ProfileBody): P
   });
   if (!error) return { ok: true };
   if (error.code === "23505") return { ok: false, reason: "exists" };
-  if (error.message.includes("email is not verified")) return { ok: false, reason: "email_not_verified" };
-  if (error.message.includes("email domain is not allowed")) return { ok: false, reason: "domain_not_allowed" };
   throw error;
 }
 

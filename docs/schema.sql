@@ -83,6 +83,7 @@ create table allowed_email_domains (
   domain text primary key check (domain = lower(domain))
 );
 
+-- Pilot: replaced by a no-op in migration 20261024000000_open_pilot_signup.sql (open sign-up, CLAUDE.md rule 6).
 create or replace function enforce_student_email() returns trigger
 language plpgsql security definer set search_path = public, auth as $$
 declare

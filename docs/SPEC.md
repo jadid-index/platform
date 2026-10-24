@@ -8,8 +8,9 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
 - Supabase (Postgres, Auth, Storage) and Next.js route handlers. The secret key (`sb_secret_...`, formerly service_role) is used
   only on the server. If you are not on Supabase, replace `auth.users`, `auth.uid()` and the RLS block.
 - Files: `schema.sql`, then `seed.sql` (generated from the v0.3 rubric workbook).
-- Sign-up is limited to verified university emails. Allowed domains live in `allowed_email_domains`
-  (seeded with `iiau.uz`, exact match; add any subdomain as its own row). A database trigger enforces this.
+- Pilot sign-up is open: any email, no email verification (team decision, 24 Oct, temporary). The
+  `allowed_email_domains` table (seeded with `iiau.uz`) and `profiles.status` stay in the schema for the later
+  identity verification (university email, HEMIS / student ID), but are not enforced now.
 - Storage buckets: `proofs` (private, signed URLs for reviewers) and `avatars` (public read).
   Path for proofs: `{student_id}/{submission_id}/{original_filename}`.
 
@@ -19,7 +20,7 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| POST | `/api/profile` | new user | Create the profile after sign-up. Body: `full_name, university_id, faculty_id, course, consent_version`. Sets `consent_at = now()`, `status = active`. The trigger rejects unverified emails and domains not in `allowed_email_domains`. |
+| POST | `/api/profile` | new user | Create the profile after sign-up. Body: `full_name, university_id, faculty_id, course, consent_version`. Sets `consent_at = now()`, `status = active`. No email-domain or verification check in the pilot. |
 | GET | `/api/me` | any | Own profile, total points, rank. |
 | GET | `/api/meta` | any | Universities, faculties, achievement types, and the rubric rows for the dropdowns. |
 | POST | `/api/extract` | student | Upload one file, get AI-extracted fields back (section 4). Never blocks submission. |
@@ -156,11 +157,11 @@ Decided by the team:
 
 - Counting starts on 2023-09-01 (`app_settings.count_from`), so 4th-year bachelor students can add earlier work.
   Each academic year has its own 100-point cap per category, so an older student can hold several years of points.
-- Sign-up accepts only verified university email addresses. There is no student approval step.
+- Pilot sign-up accepts any email address with no email verification and no student approval step. Identity verification (HEMIS / student ID) comes later.
 - The leaderboard is visible without login.
 - Reviewers see every pending submission. There is no split by category for now (it can be added later).
 - Faculties: Islamic Studies, Classical Oriental Philology, Islamic Economics and International Relations (one faculty).
-- Allowed email domain: `iiau.uz`.
+- `iiau.uz` stays in `allowed_email_domains` as a future verification signal.
 - The default leaderboard shows the current academic year, with tabs for earlier years and all-time.
 - Contact email in the consent notice: fazlddn4@gmail.com.
 
@@ -170,7 +171,7 @@ Still open:
    empty, because most real certificates are older. Demo from the 2025/26 or all-time tab, or have the pilot students
    also submit something dated since 1 September.
 2. Add the profile photo to the list of public data in the consent notice.
-3. If students use a subdomain (for example `student.iiau.uz`), add it to `allowed_email_domains`.
+3. Later: how identity verification (university email, HEMIS / student ID) should show on profiles.
 
 ## 7. Build order (Mon night to Thursday)
 

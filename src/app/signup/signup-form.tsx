@@ -2,6 +2,7 @@
 
 import { MailCheck } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Field } from "@/components/field";
@@ -25,6 +26,7 @@ import { emailSchema, PASSWORD_MIN_LENGTH } from "@/lib/validation";
 type Errors = ProfileErrors & { email?: string; password?: string };
 
 export function SignupForm({ universities }: { universities: University[] }) {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileValues>(() => emptyProfileValues(universities));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,31 +48,17 @@ export function SignupForm({ universities }: { universities: University[] }) {
 
     setSubmitting(true);
     try {
-      // 1. Check the domain before creating the auth user, so the student gets a clear message.
-      const res = await fetch("/api/auth/check-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: parsedEmail.data }),
-      });
-      if (!res.ok) {
-        setFormError(res.status === 400 ? t.errors.emailInvalid : t.common.genericError);
-        return;
-      }
-      const { allowed } = (await res.json()) as { allowed: boolean };
-      if (!allowed) {
-        setErrors({ email: t.errors.domainNotAllowed });
-        return;
-      }
-
-      // 2. Create the auth user. The profile fields travel in user metadata and are submitted
-      //    to /api/profile after the email is verified (the onboarding screen).
+      // 1. Create the auth user. Pilot sign-up is open (any email, no verification), so with
+      //    "Confirm email" off in Supabase Auth this returns a session right away.
+      //    The profile fields also travel in user metadata, so onboarding can prefill them.
+      const profileBody = toProfileBody(profile, CONSENT_VERSION);
       const supabase = createAuthClient();
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: parsedEmail.data,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/confirm`,
-          data: toProfileBody(profile, CONSENT_VERSION),
+          data: profileBody,
         },
       });
       if (error) {
@@ -79,7 +67,20 @@ export function SignupForm({ universities }: { universities: University[] }) {
         else setFormError(t.common.genericError);
         return;
       }
-      setSentTo(parsedEmail.data);
+      // Fallback while "Confirm email" is still on: no session until the link is clicked.
+      if (!data.session) {
+        setSentTo(parsedEmail.data);
+        return;
+      }
+
+      // 2. Create the profile. If that fails, onboarding shows the error and lets the student retry.
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileBody),
+      });
+      router.replace(res.ok || res.status === 409 ? "/dashboard" : "/onboarding");
+      router.refresh();
     } catch {
       setFormError(t.common.genericError);
     } finally {
