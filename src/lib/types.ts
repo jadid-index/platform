@@ -69,6 +69,7 @@ export type SubmissionForReview = {
   parent_id: string | null;
   submitted_at: string;
   file_path: string;
+  ai_extraction: unknown; // raw extraction result (src/lib/extraction.ts), null when there was none
   student: { id: string; full_name: string; faculty: string | null; course: number | null };
 };
 

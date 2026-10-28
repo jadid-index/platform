@@ -220,6 +220,101 @@ export async function logUploadUrlRequest(studentId: string, submissionId: strin
   if (error) throw error;
 }
 
+// The upload-url request this student made for this submission id, from audit_log (see logUploadUrlRequest).
+export async function getIssuedUpload(
+  studentId: string,
+  submissionId: string,
+): Promise<{ file_name: string; created_at: string } | null> {
+  const { data, error } = await getAdminClient()
+    .from("audit_log")
+    .select("details, created_at")
+    .eq("actor_id", studentId)
+    .eq("action", UPLOAD_URL_ACTION)
+    .eq("entity", "submission")
+    .eq("entity_id", submissionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const fileName = (data?.details as { file_name?: unknown } | null)?.file_name;
+  return data && typeof fileName === "string" ? { file_name: fileName, created_at: data.created_at as string } : null;
+}
+
+// Extraction calls, counted for the per-student and global limits. Only the outcome is stored, never content.
+const EXTRACT_ACTION = "proof.extract";
+
+export async function countExtractionsSince(sinceIso: string, studentId?: string): Promise<number> {
+  let query = getAdminClient()
+    .from("audit_log")
+    .select("id", { count: "exact", head: true })
+    .eq("action", EXTRACT_ACTION)
+    .gte("created_at", sinceIso);
+  if (studentId) query = query.eq("actor_id", studentId);
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function logExtraction(studentId: string, submissionId: string, outcome: string): Promise<number> {
+  const { data, error } = await getAdminClient()
+    .from("audit_log")
+    .insert({ actor_id: studentId, action: EXTRACT_ACTION, entity: "submission", entity_id: submissionId, details: { outcome } })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as number;
+}
+
+export async function setExtractionOutcome(logId: number, outcome: string): Promise<void> {
+  const { error } = await getAdminClient().from("audit_log").update({ details: { outcome } }).eq("id", logId);
+  if (error) console.error("extraction outcome not recorded", logId);
+}
+
+export type LiveDuplicate = { id: string; title: string; achievement_date: string; status: string; same_student: boolean; reason: "certificate_ref" | "title_date" };
+
+// Other pending or approved submissions with the same certificate number, or the same student, title and date.
+export async function findLiveDuplicates(s: {
+  id: string;
+  student_id: string;
+  title: string;
+  achievement_date: string;
+  certificate_ref: string | null;
+}): Promise<LiveDuplicate[]> {
+  const db = getAdminClient();
+  const ref = s.certificate_ref?.trim();
+  const [byRef, byTitle] = await Promise.all([
+    ref
+      ? db
+          .from("submissions")
+          .select("id, student_id, title, achievement_date, status")
+          .ilike("certificate_ref", ref.replace(/[\\%_]/g, (c) => `\\${c}`))
+          .in("status", ["pending", "approved"])
+          .neq("id", s.id)
+          .limit(10)
+      : Promise.resolve({ data: [], error: null }),
+    db
+      .from("submissions")
+      .select("id, student_id, title, achievement_date, status")
+      .eq("student_id", s.student_id)
+      .eq("achievement_date", s.achievement_date)
+      .ilike("title", s.title.trim().replace(/[\\%_]/g, (c) => `\\${c}`))
+      .in("status", ["pending", "approved"])
+      .neq("id", s.id)
+      .limit(10),
+  ]);
+  if (byRef.error) throw byRef.error;
+  if (byTitle.error) throw byTitle.error;
+  const out = new Map<string, LiveDuplicate>();
+  type Row = { id: string; student_id: string; title: string; achievement_date: string; status: string };
+  for (const r of (byRef.data ?? []) as Row[]) {
+    out.set(r.id, { id: r.id, title: r.title, achievement_date: r.achievement_date, status: r.status, same_student: r.student_id === s.student_id, reason: "certificate_ref" });
+  }
+  for (const r of (byTitle.data ?? []) as Row[]) {
+    if (!out.has(r.id)) out.set(r.id, { id: r.id, title: r.title, achievement_date: r.achievement_date, status: r.status, same_student: true, reason: "title_date" });
+  }
+  return [...out.values()];
+}
+
 // A "live" file is one on a pending or approved submission (same rule as submissions_live_file_uq).
 export async function isLiveFile(sha256: string): Promise<boolean> {
   const { data, error } = await getAdminClient()
@@ -247,6 +342,7 @@ export type NewSubmission = {
   file_sha256: string;
   parent_id: string | null;
   student_comment: string | null;
+  ai_extraction?: unknown;
 };
 
 export async function insertSubmission(
@@ -364,7 +460,7 @@ export async function getSubmissionForReview(submissionId: string): Promise<Subm
   const { data, error } = await getAdminClient()
     .from("submissions")
     .select(
-      "id, status, type_id, level, result, title, issuer, achievement_date, certificate_ref, note, student_comment, parent_id, submitted_at, file_path, profiles(id, full_name, course, faculties(name))",
+      "id, status, type_id, level, result, title, issuer, achievement_date, certificate_ref, note, student_comment, parent_id, submitted_at, file_path, ai_extraction, profiles(id, full_name, course, faculties(name))",
     )
     .eq("id", submissionId)
     .maybeSingle();

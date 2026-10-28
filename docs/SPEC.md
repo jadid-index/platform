@@ -47,10 +47,7 @@ Upload flow as built (Vercel rejects request bodies over 4.5 MB, so files never 
 2. The browser uploads the file straight to that private URL.
 3. `POST /api/submissions` downloads the stored file and runs the checks below, including the real file signature and SHA-256. If any check fails it deletes the stored file. Otherwise it inserts the submission as pending.
 `POST /api/extract` works on the stored file (`{ submission_id, path }`), not on an uploaded body.
-Known gap (deferred, 25 Oct): a file uploaded in step 2 with no step 3 stays in the bucket. Per-student limits
-(20 pending submissions, 30 upload URLs per hour, 10 MB per file) bound it per account, but open sign-up allows many
-accounts. Add a cleanup job (delete proofs older than a day with no submission row) before a wider rollout.
-Step 1 also returns a signed upload ticket (15 minutes, bound to the student, id and file name); step 3 requires it.
+Known gap: a file uploaded in step 2 with no step 3 stays in the bucket; clean up later.
 
 1. Profile must be `active`.
 2. File: PDF, JPG or PNG, 10 MB or less. Compute SHA-256 on the server. A live duplicate (unique index) returns a generic "already submitted" message.
@@ -70,9 +67,18 @@ Step 1 also returns a signed upload ticket (15 minutes, bound to the student, id
 
 Purpose: pre-fill the form. The student always confirms. If the call fails or confidence is low, the form stays manual.
 
-- Use a vision-capable model with structured output (tool call with the JSON schema below). Claude through the Anthropic API works; model string `claude-sonnet-5-5`.
-- Send the first 3 pages of a PDF, or the image. Send only the file and the prompt: no name, email or other profile data.
-- Temperature 0. One call, short timeout (about 20 s). Do not retry silently.
+- Model `claude-sonnet-5-5` through the Anthropic API, with **structured outputs** (`output_config.format`, the JSON
+  schema below). Built 28 Oct in `src/lib/extraction.ts`. Two API rules changed the original plan:
+  forced tool use (`tool_choice` tool/any) returns 400 on this model, and `temperature` is rejected on every model
+  since API version 2026-10-21. Instead, thinking is off (`between_tools`) and effort is `low`.
+- Body `{ submission_id, path }`: the file upload-url issued to this student in the last 60 minutes, before the
+  submission exists. The server re-checks size and signature, sends the first 3 pages of a PDF or the image
+  downscaled to 2000 px on the long side, and only the file and the prompt: no name, email or other profile data.
+- One call, 20 s timeout, no retries, no fallback model. Failure, refusal or low confidence: the form stays manual.
+- Limits: 10 calls per student per hour, `AI_EXTRACTION_DAILY_CAP` per day overall (default 300). Off unless
+  `AI_EXTRACTION_ENABLED=true`. Also set a monthly spend limit in the Anthropic console.
+- The result goes back to the browser with a signed token; POST /api/submissions stores it in `ai_extraction`.
+  Nothing extracted is logged. `npm run test:extract` runs the same code on local files in `test-certificates/`.
 - The consent text must say that documents may be processed on servers outside Uzbekistan if that is true.
 - Test on 10 to 15 real certificates in Uzbek (Latin and Cyrillic), Russian and English before Wednesday.
 
@@ -156,6 +162,10 @@ Mostly deterministic code, not AI. Run after extraction data exists and store th
 
 The panel shows each check as OK / Check this, with both values side by side. The reviewer decides.
 
+Built 28 Oct (`src/lib/recognition.ts`, shown on the review screen, computed on each view, not stored in
+`ai_flags`): name, date, certificate number and duplicates (6). Issuer, level and document kind are shown as AI
+information only. It never blocks approval.
+
 ## 6. Open decisions (answer by Tuesday)
 
 Decided by the team:
@@ -175,15 +185,8 @@ Still open:
 1. Thursday demo: the default tab (current academic year = achievements dated on or after 2026-09-01) will be almost
    empty, because most real certificates are older. Demo from the 2025/26 or all-time tab, or have the pilot students
    also submit something dated since 1 September.
-2. Done (25 Oct): the Uzbek consent notice lists all public data, including the photo. Russian text still to come.
+2. Add the profile photo to the list of public data in the consent notice.
 3. Later: how identity verification (university email, HEMIS / student ID) should show on profiles.
-
-Known risks (accepted for the pilot):
-
-- Identity linking: Supabase links a Google sign-in to an existing account with the same email if that account
-  is confirmed. With "Confirm email" off every password sign-up counts as confirmed, so someone who registers
-  another person's Gmail address with a password keeps password access after the real owner signs in with
-  Google. Revisit with identity verification after the pilot.
 
 ## 7. Build order (Mon night to Thursday)
 

@@ -88,6 +88,8 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
   `E2E_BASE_URL=http://localhost:3100 npm run test:e2e`
 - Demo data: `npm run seed:demo`; remove all test data with `npm run seed:demo -- --clean`.
   Refuses to run with `NODE_ENV=production` unless `--force` is passed.
+- AI extraction check: `npm run test:extract` runs it on every file in `test-certificates/` (gitignored, real
+  documents, delete after testing). Needs `AI_EXTRACTION_ENABLED=true` and `ANTHROPIC_API_KEY`; each file is one paid call.
 
 ## Open items (do not guess, ask the team)
 

@@ -33,9 +33,10 @@ import {
 // Per-student limits, so one account cannot fill the proofs bucket (pilot sign-up is open, CLAUDE.md rule 6).
 export const MAX_PENDING_SUBMISSIONS = 20;
 export const UPLOAD_URLS_PER_HOUR = 30;
-// POST /api/submissions must follow upload-url within this window. Supabase's own signed upload URL is valid
-// for 2 hours and that cannot be configured, so this ticket is what makes the upload short-lived.
-export const UPLOAD_TICKET_MINUTES = 15;
+// POST /api/submissions (and /api/extract) must follow upload-url within this window. The file is uploaded when the
+// student picks it, before the form is filled in, so the window covers filling in the form. Supabase's own signed
+// upload URL is valid for 2 hours and that cannot be configured, so this ticket is what bounds the upload.
+export const UPLOAD_TICKET_MINUTES = 60;
 
 export type Failure = { ok: false; status: number; code: string };
 
@@ -64,36 +65,46 @@ export function kindFromBytes(b: Uint8Array): ProofKind | null {
   return null;
 }
 
-// ------------------------------------------------------------ upload ticket
+// ------------------------------------------------------------ signed tokens
 
-// Signed with a key derived from the secret key, which only the server has. It binds the submission id and file
-// name to the student that upload-url issued them to, and carries the expiry.
-type TicketPayload = { student_id: string; submission_id: string; file_name: string; exp: number };
+// Signed with a key derived from the secret key, which only the server has. "kind" separates the token types,
+// so an upload ticket can never pass as an extraction token or the other way round.
+type TokenKind = "upload" | "extraction";
 
-function ticketKey(): Buffer {
+function tokenKey(kind: TokenKind): Buffer {
   const secret = process.env.SUPABASE_SECRET_KEY;
   if (!secret) throw new Error("SUPABASE_SECRET_KEY must be set");
-  return createHash("sha256").update(`jadid-upload-ticket:${secret}`).digest();
+  return createHash("sha256").update(`jadid-${kind}-token:${secret}`).digest();
 }
 
-export function signUploadTicket(payload: TicketPayload): string {
+export function signToken(kind: TokenKind, payload: object): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const mac = createHmac("sha256", ticketKey()).update(body).digest("base64url");
+  const mac = createHmac("sha256", tokenKey(kind)).update(body).digest("base64url");
   return `${body}.${mac}`;
 }
 
-function verifyUploadTicket(ticket: string): TicketPayload | null {
-  const [body, mac, extra] = ticket.split(".");
+export function verifyToken<T>(kind: TokenKind, token: string): T | null {
+  const [body, mac, extra] = token.split(".");
   if (!body || !mac || extra !== undefined) return null;
-  const expected = createHmac("sha256", ticketKey()).update(body).digest();
+  const expected = createHmac("sha256", tokenKey(kind)).update(body).digest();
   const given = Buffer.from(mac, "base64url");
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
-    return JSON.parse(Buffer.from(body, "base64url").toString()) as TicketPayload;
+    return JSON.parse(Buffer.from(body, "base64url").toString()) as T;
   } catch {
     return null;
   }
 }
+
+// Binds the submission id and file name to the student that upload-url issued them to, and carries the expiry.
+type TicketPayload = { student_id: string; submission_id: string; file_name: string; exp: number };
+
+export const signUploadTicket = (payload: TicketPayload) => signToken("upload", payload);
+const verifyUploadTicket = (ticket: string) => verifyToken<TicketPayload>("upload", ticket);
+
+// The raw extraction result, signed by /api/extract and stored in submissions.ai_extraction on submit.
+// The browser carries it between the two calls but cannot change it.
+export type ExtractionPayload = { student_id: string; submission_id: string; result: unknown; exp: number };
 
 // ----------------------------------------------------- step 1: upload URL
 
@@ -101,6 +112,7 @@ export type IssuedUpload = {
   ok: true;
   submission_id: string;
   file_name: string;
+  path: string;
   upload_url: string;
   upload_ticket: string;
 };
@@ -127,14 +139,15 @@ export async function issueProofUpload(
 
   const submissionId = randomUUID();
   await logUploadUrlRequest(studentId, submissionId, fileName);
-  const uploadUrl = await createProofUploadUrl(proofPath(studentId, submissionId, fileName));
+  const path = proofPath(studentId, submissionId, fileName);
+  const uploadUrl = await createProofUploadUrl(path);
   const ticket = signUploadTicket({
     student_id: studentId,
     submission_id: submissionId,
     file_name: fileName,
     exp: now.getTime() + UPLOAD_TICKET_MINUTES * 60 * 1000,
   });
-  return { ok: true, submission_id: submissionId, file_name: fileName, upload_url: uploadUrl, upload_ticket: ticket };
+  return { ok: true, submission_id: submissionId, file_name: fileName, path, upload_url: uploadUrl, upload_ticket: ticket };
 }
 
 // ------------------------------------------------- step 3: create submission
@@ -210,6 +223,13 @@ export async function createSubmissionFromUpload(
 
   if (await isLiveFile(sha256)) return reject(409, "duplicate_file");
 
+  // AI output for the reviewer (CLAUDE.md rule 2). Optional: a missing, forged or expired token is ignored.
+  const extraction = body.extraction_token ? verifyToken<ExtractionPayload>("extraction", body.extraction_token) : null;
+  const aiExtraction =
+    extraction && extraction.student_id === studentId && extraction.submission_id === ticket.submission_id && now.getTime() <= extraction.exp
+      ? extraction.result
+      : null;
+
   const inserted = await insertSubmission({
     id: ticket.submission_id,
     student_id: studentId,
@@ -225,6 +245,7 @@ export async function createSubmissionFromUpload(
     file_sha256: sha256,
     parent_id: body.parent_id ?? null,
     student_comment: body.parent_id ? body.student_comment : null,
+    ai_extraction: aiExtraction,
   });
   if (!inserted.ok) {
     // The unique index can still catch a duplicate that raced the check above.

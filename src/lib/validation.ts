@@ -54,6 +54,8 @@ export const submissionBodySchema = z.object({
   file_name: z.string().trim().min(1).max(255),
   // Signed by upload-url; binds submission_id and file_name to the student (see src/lib/submissions.ts).
   upload_ticket: z.string().min(1).max(2000),
+  // Signed by /api/extract; the server stores its result in ai_extraction (see src/lib/submissions.ts).
+  extraction_token: z.string().max(20_000).optional(),
   type_id: z.number().int().positive(),
   level: z.enum(LEVELS),
   result: z.enum(RESULTS).optional(),
@@ -67,6 +69,12 @@ export const submissionBodySchema = z.object({
 });
 
 export type SubmissionBody = z.infer<typeof submissionBodySchema>;
+
+// POST /api/extract: the proof upload-url issued, before the submission exists.
+export const extractBodySchema = z.object({
+  submission_id: z.uuid(),
+  path: z.string().min(1).max(600),
+});
 
 // Storage keys accept a limited character set, so keep the extension and replace everything unusual.
 export function safeFileName(name: string): string {

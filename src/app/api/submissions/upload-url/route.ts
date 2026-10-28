@@ -23,8 +23,8 @@ export async function POST(request: Request) {
 
     const issued = await issueProofUpload(auth.userId, parsed.data);
     if (!issued.ok) return apiError(issued.status, issued.code);
-    const { submission_id, file_name, upload_url, upload_ticket } = issued;
-    return NextResponse.json({ submission_id, file_name, upload_url, upload_ticket });
+    const { submission_id, file_name, path, upload_url, upload_ticket } = issued;
+    return NextResponse.json({ submission_id, file_name, path, upload_url, upload_ticket });
   } catch (error) {
     console.error("upload-url failed", error);
     return apiError(500, "server_error");

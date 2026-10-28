@@ -32,7 +32,10 @@ Live URL: `https://<your-project>.vercel.app` (fill in after the first deploy).
 5. **Back to the leaderboard**: the student appears with the new points straight away.
 6. (Optional) Reject a second submission with a reason, then show the reason on the student's dashboard.
 
-Talking point for AI: the "AI baholash" panel is a placeholder. AI will only pre-fill and flag; people decide.
+Talking point for AI: when the student picks the file, AI reads it and pre-fills title, issuer, date and number;
+level and result appear only as suggestions to accept. On the review screen, "Tanib olish tekshiruvi" compares the
+document's name, date and number with the profile and the form, and warns about duplicates. Plain code, not AI;
+it never blocks. AI only pre-fills and flags; people decide. (Needs AI_EXTRACTION_ENABLED=true in Vercel.)
 
 ## Checklist on the live URL
 

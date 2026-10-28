@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 !.env.example
+
+# Real certificates for scripts/test-extract.ts. Students' documents: never commit them.
+/test-certificates/

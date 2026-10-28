@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Check, CheckCircle2, X } from "lucide-react";
+import { Check, CheckCircle2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -64,7 +64,6 @@ export function ReviewPanel({
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showAi, setShowAi] = useState(false);
   // Set after a successful approval, from the reviews row returned by approve_submission().
   const [approved, setApproved] = useState<{ rubric_points: number; points_awarded: number } | null>(null);
 
@@ -229,21 +228,6 @@ export function ReviewPanel({
         </CardContent>
       </Card>
 
-      {/* Placeholder: the recognition check (SPEC section 5) is not implemented yet. */}
-      <Card className="gap-3 py-4">
-        <CardHeader className="px-4">
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="size-5 text-primary-strong" aria-hidden />
-            {t.review.aiTitle}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 px-4">
-          <Button variant="outline" className="w-fit" onClick={() => setShowAi((v) => !v)} aria-expanded={showAi}>
-            {t.review.aiButton}
-          </Button>
-          {showAi ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">{t.review.aiSoon}</p> : null}
-        </CardContent>
-      </Card>
     </div>
   );
 }
