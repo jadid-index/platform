@@ -26,8 +26,10 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
    The browser uses only the publishable key (`sb_publishable_...`). Do not use the legacy anon / service_role keys.
 4. **Uploaded proof files are private.** Store them in the private `proofs` bucket and give reviewers short-lived
    signed URLs. Never show a file or a file URL on the leaderboard or on a public profile.
-5. **Public data is limited** to name, faculty, score, approved work titles and (if uploaded) the profile photo.
-   That is exactly what the consent notice promises. Do not add anything else to public views.
+5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`) promises:
+   name, university, faculty, score, the number of approved works, and for each approved work its title, type,
+   level, result, date and points, plus the profile photo if the student uploaded one. Never the email, course or
+   files. Do not add anything else to public views; if you must, change the notice and bump its version first.
    Google sign-in must not import a profile photo (no avatar_url), and the name from Google is only a
    suggestion that the student confirms, because it is shown publicly.
 6. **Pilot sign-up is open: any email address, no email verification** (team decision, 24 Oct, temporary).
@@ -77,15 +79,20 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
 
 ## Commands
 
-Fill these in after the project is scaffolded:
-
 - Install: `npm install`
 - Dev server: `npm run dev`
 - Type check and lint: `npm run lint` and `npx tsc --noEmit`
-- Tests: `npm test` (add tests at least for the approve/reject flow and the leaderboard query)
+- Tests: `npm test`. Integration tests against the Supabase project in `.env.test.local`, or `.env.local` if there
+  is none. They create `test-...@example.invalid` users and remove them afterwards.
+- Live-app tests (cache, health, review route access): `npm run build && npx next start -p 3100`, then
+  `E2E_BASE_URL=http://localhost:3100 npm run test:e2e`
+- Demo data: `npm run seed:demo`; remove all test data with `npm run seed:demo -- --clean`.
+  Refuses to run with `NODE_ENV=production` unless `--force` is passed.
 
 ## Open items (do not guess, ask the team)
 
-- The exact consent notice text (Uzbek, Russian) and its version string.
+- The Russian consent text (the Uzbek text is approved, version `uz-2026-10-25`).
+- Abandoned uploads: a proof uploaded without step 3 stays in the bucket. Limits cap it at about 300 MB per
+  account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (accounts are created by hand in the database for now).

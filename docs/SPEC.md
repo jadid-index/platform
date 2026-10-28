@@ -47,7 +47,10 @@ Upload flow as built (Vercel rejects request bodies over 4.5 MB, so files never 
 2. The browser uploads the file straight to that private URL.
 3. `POST /api/submissions` downloads the stored file and runs the checks below, including the real file signature and SHA-256. If any check fails it deletes the stored file. Otherwise it inserts the submission as pending.
 `POST /api/extract` works on the stored file (`{ submission_id, path }`), not on an uploaded body.
-Known gap: a file uploaded in step 2 with no step 3 stays in the bucket; clean up later.
+Known gap (deferred, 25 Oct): a file uploaded in step 2 with no step 3 stays in the bucket. Per-student limits
+(20 pending submissions, 30 upload URLs per hour, 10 MB per file) bound it per account, but open sign-up allows many
+accounts. Add a cleanup job (delete proofs older than a day with no submission row) before a wider rollout.
+Step 1 also returns a signed upload ticket (15 minutes, bound to the student, id and file name); step 3 requires it.
 
 1. Profile must be `active`.
 2. File: PDF, JPG or PNG, 10 MB or less. Compute SHA-256 on the server. A live duplicate (unique index) returns a generic "already submitted" message.
@@ -172,7 +175,7 @@ Still open:
 1. Thursday demo: the default tab (current academic year = achievements dated on or after 2026-09-01) will be almost
    empty, because most real certificates are older. Demo from the 2025/26 or all-time tab, or have the pilot students
    also submit something dated since 1 September.
-2. Add the profile photo to the list of public data in the consent notice.
+2. Done (25 Oct): the Uzbek consent notice lists all public data, including the photo. Russian text still to come.
 3. Later: how identity verification (university email, HEMIS / student ID) should show on profiles.
 
 Known risks (accepted for the pilot):

@@ -1,14 +1,13 @@
-import { randomUUID } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
 import { apiError, readJson } from "@/lib/api";
 import { requireActiveStudent } from "@/lib/auth";
-import { createProofUploadUrl, proofPath } from "@/lib/db";
-import { safeFileName, uploadUrlBodySchema } from "@/lib/validation";
+import { issueProofUpload } from "@/lib/submissions";
+import { uploadUrlBodySchema } from "@/lib/validation";
 
 // Step 1 of adding an achievement: reserve a submission id and return a one-time upload URL for
-// proofs/{student_id}/{submission_id}/{file_name}. The file is checked and hashed in POST /api/submissions.
+// proofs/{student_id}/{submission_id}/{file_name} plus a short-lived upload ticket. Limits and checks live in
+// issueProofUpload(); the file is checked and hashed in POST /api/submissions.
 export async function POST(request: Request) {
   const parsed = uploadUrlBodySchema.safeParse(await readJson(request));
   if (!parsed.success) {
@@ -22,10 +21,10 @@ export async function POST(request: Request) {
     const auth = await requireActiveStudent();
     if (!auth.ok) return apiError(auth.status, auth.error);
 
-    const submissionId = randomUUID();
-    const fileName = safeFileName(parsed.data.file_name);
-    const uploadUrl = await createProofUploadUrl(proofPath(auth.userId, submissionId, fileName));
-    return NextResponse.json({ submission_id: submissionId, file_name: fileName, upload_url: uploadUrl });
+    const issued = await issueProofUpload(auth.userId, parsed.data);
+    if (!issued.ok) return apiError(issued.status, issued.code);
+    const { submission_id, file_name, upload_url, upload_ticket } = issued;
+    return NextResponse.json({ submission_id, file_name, upload_url, upload_ticket });
   } catch (error) {
     console.error("upload-url failed", error);
     return apiError(500, "server_error");

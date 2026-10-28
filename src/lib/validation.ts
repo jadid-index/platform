@@ -46,10 +46,14 @@ export const uploadUrlBodySchema = z.object({
   content_type: z.enum(PROOF_CONTENT_TYPES),
 });
 
+export type UploadUrlBody = z.infer<typeof uploadUrlBodySchema>;
+
 // Step 2: create the submission once the file is uploaded.
 export const submissionBodySchema = z.object({
   submission_id: z.uuid(),
   file_name: z.string().trim().min(1).max(255),
+  // Signed by upload-url; binds submission_id and file_name to the student (see src/lib/submissions.ts).
+  upload_ticket: z.string().min(1).max(2000),
   type_id: z.number().int().positive(),
   level: z.enum(LEVELS),
   result: z.enum(RESULTS).optional(),

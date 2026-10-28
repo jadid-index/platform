@@ -60,6 +60,10 @@ const API_ERRORS: Record<string, string> = {
   date_in_future: t.errors.dateInFuture,
   certificate_ref_required: t.errors.certificateRefRequired,
   invalid_body: t.errors.invalidBody,
+  invalid_ticket: t.errors.uploadExpired,
+  upload_expired: t.errors.uploadExpired,
+  too_many_pending: t.errors.tooManyPending,
+  rate_limited: t.errors.rateLimited,
 };
 
 type Phase = "idle" | "uploading" | "submitting" | "done";
@@ -133,7 +137,12 @@ export function AchievementForm({ meta }: { meta: Meta }) {
         body: JSON.stringify({ file_name: file.name, size: file.size, content_type: file.type }),
       });
       if (!urlRes.ok) return fail(urlRes);
-      const upload = (await urlRes.json()) as { submission_id: string; file_name: string; upload_url: string };
+      const upload = (await urlRes.json()) as {
+        submission_id: string;
+        file_name: string;
+        upload_url: string;
+        upload_ticket: string;
+      };
 
       // 2. Upload the file straight to the private bucket.
       const put = await fetch(upload.upload_url, {
@@ -159,6 +168,7 @@ export function AchievementForm({ meta }: { meta: Meta }) {
         body: JSON.stringify({
           submission_id: upload.submission_id,
           file_name: upload.file_name,
+          upload_ticket: upload.upload_ticket,
           type_id: type.id,
           level: values.level as Level,
           result: type.has_placement ? (values.result as Result) : undefined,

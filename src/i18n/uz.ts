@@ -62,12 +62,18 @@ export const uz = {
     noUniversities: "Hozircha universitetlar qoʻshilmagan.",
   },
   consent: {
-    title: "Maʼlumotlarni qayta ishlashga rozilik",
-    // PLACEHOLDER until the team approves the final text. See src/lib/consent.ts.
-    text: "[Rozilik matni hali tasdiqlanmagan. Yakuniy matn jamoa tomonidan qoʻshiladi.]",
-    checkbox: "Rozilik matnini oʻqidim va maʼlumotlarimni qayta ishlashga roziman.",
+    title: "Jadid Index-dagi maʼlumotlaringiz",
+    // Version: CONSENT_VERSION in src/lib/consent.ts. Bump it whenever this text changes.
+    text: [
+      "Profilingizni yaratish va yutuqlaringizni baholash (reytinglash) uchun biz sizning toʻliq ism-sharifingiz, e-pochta manzilingiz, oʻqiyotgan universitetingiz, fakultetingiz, kursingiz hamda yuklagan hujjatlaringizni (sertifikatlar, ilmiy ishlar va shu kabilar) toʻplaymiz. Google orqali kirsangiz, Googledagi ismingiz faqat taklif sifatida koʻrsatiladi va uni oʻzingiz tasdiqlaysiz; Google profil rasmingiz ishlatilmaydi va koʻrsatilmaydi.",
+      "Hujjatlaringizni faqat platforma tekshiruvchilari koʻra oladi. Reyting jadvalida va ochiq profilingizda quyidagilar hammaga koʻrinadi: ism-sharifingiz, universitetingiz, fakultetingiz, toʻplagan ballingiz, tasdiqlangan yutuqlaringiz soni hamda har bir tasdiqlangan yutuqning nomi, turi, darajasi, natijasi, sanasi va bali, shuningdek profil rasmingiz (agar oʻzingiz yuklasangiz). E-pochta manzilingiz, kursingiz va yuklagan fayllaringiz ommaga oshkor qilinmaydi.",
+      "Maʼlumotlaringiz Oʻzbekistondan tashqarida joylashgan serverlarda saqlanadi. Formalarni avtomatik toʻldirish maqsadida yuklangan sertifikatlar matnni avtomatik aniqlash xizmati orqali qayta ishlanishi mumkin; bu xizmatga faqat hujjatning oʻzi yuboriladi, profil maʼlumotlaringiz yuborilmaydi. Ushbu jarayon ham Oʻzbekistondan tashqaridagi serverlarda amalga oshirilishi mumkin.",
+      "Istalgan vaqtda fazlddn4@gmail.com manziliga yozish orqali hisobingiz va hujjatlaringizni oʻchirishni soʻrashingiz mumkin.",
+    ].join("\n\n"),
+    checkbox: "Ushbu bildirishnoma bilan tanishdim va shaxsiy maʼlumotlarim qayta ishlanishiga roziman.",
     required: "Davom etish uchun rozilik belgisini qoʻying.",
   },
+
   signup: {
     title: "Roʻyxatdan oʻtish",
     subtitle: "E-pochtangiz bilan hisob yarating.",
@@ -405,6 +411,9 @@ export const uz = {
     fileMissing: "Fayl yuklanmadi. Qaytadan urinib koʻring.",
     uploadFailed: "Faylni yuklab boʻlmadi. Internet aloqasini tekshirib, qaytadan urinib koʻring.",
     duplicateFile: "Bu hujjat allaqachon yuborilgan.",
+    uploadExpired: "Yuklash muddati tugadi. Faylni qaytadan tanlab, yana yuboring.",
+    tooManyPending:
+      "Sizda koʻrib chiqilishi kutilayotgan yutuqlar juda koʻp (20 ta). Avval ular koʻrib chiqilishini kuting.",
     invalidCombination: "Bu tur, daraja va natija birikmasi reytingda mavjud emas.",
     invalidBody: "Maʼlumotlar notoʻgʻri. Formani tekshirib, qaytadan yuboring.",
     notPending: "Faqat koʻrib chiqilayotgan yutuqni qaytarib olish mumkin.",

@@ -185,6 +185,41 @@ export async function submissionExists(submissionId: string): Promise<boolean> {
   return data !== null;
 }
 
+export async function countPendingSubmissions(studentId: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", studentId)
+    .eq("status", "pending");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+// Upload URL requests are written to audit_log, which doubles as the per-student hourly counter.
+const UPLOAD_URL_ACTION = "proof.upload_url";
+
+export async function countUploadUrlRequestsSince(studentId: string, sinceIso: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("audit_log")
+    .select("id", { count: "exact", head: true })
+    .eq("actor_id", studentId)
+    .eq("action", UPLOAD_URL_ACTION)
+    .gte("created_at", sinceIso);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function logUploadUrlRequest(studentId: string, submissionId: string, fileName: string): Promise<void> {
+  const { error } = await getAdminClient().from("audit_log").insert({
+    actor_id: studentId,
+    action: UPLOAD_URL_ACTION,
+    entity: "submission",
+    entity_id: submissionId,
+    details: { file_name: fileName },
+  });
+  if (error) throw error;
+}
+
 // A "live" file is one on a pending or approved submission (same rule as submissions_live_file_uq).
 export async function isLiveFile(sha256: string): Promise<boolean> {
   const { data, error } = await getAdminClient()
