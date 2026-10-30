@@ -14,7 +14,7 @@ export default function Error({ error, retry }: { error: unknown; retry: () => v
   }, [error]);
 
   return (
-    <main className="mx-auto grid w-full max-w-md gap-3 px-4 py-10">
+    <div className="mx-auto grid w-full max-w-md gap-3 py-4">
       <Alert variant="destructive">
         <AlertCircle aria-hidden />
         <AlertDescription>{t.common.genericError}</AlertDescription>
@@ -22,6 +22,6 @@ export default function Error({ error, retry }: { error: unknown; retry: () => v
       <Button variant="outline" onClick={() => retry()}>
         {t.common.retry}
       </Button>
-    </main>
+    </div>
   );
 }

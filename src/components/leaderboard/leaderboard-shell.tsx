@@ -49,7 +49,8 @@ export function LeaderboardShell({
   const faculties = facultySource?.faculties ?? [];
 
   return (
-    <div className="grid gap-4">
+    // minmax(0,1fr): the scrollable year tabs must not widen the page past the phone screen.
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
       <Tabs
         value={String(year)}
         // Always explicit: without ?year the page may fall back from an empty current year.

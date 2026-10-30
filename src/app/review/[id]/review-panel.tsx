@@ -8,7 +8,7 @@ import { Field } from "@/components/field";
 import { resolveRubric, RubricSelects, validateRubric, type RubricValue } from "@/components/rubric-selects";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ds";
 import { Textarea } from "@/components/ui/textarea";
 import { academicYearLabel, format, formatDate, t } from "@/i18n";
 import type { AchievementType, PointsPreview, RubricRow } from "@/lib/types";

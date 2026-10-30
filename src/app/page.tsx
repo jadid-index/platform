@@ -1,14 +1,12 @@
-import { Info } from "lucide-react";
+import { Info, Trophy } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { ErrorState } from "@/components/error-state";
+import { Card, CardContent, EmptyState as EmptyCard, ErrorState, ListSkeleton, RankBadge } from "@/components/ds";
 import { LeaderboardShell } from "@/components/leaderboard/leaderboard-shell";
-import { LoadingState } from "@/components/loading-state";
 import { StudentAvatar } from "@/components/student-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { academicYearLabel, format, t } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import { getDefaultLeaderboard, getLeaderboard, getProfileAccess, getUniversitiesCached } from "@/lib/db";
@@ -36,40 +34,14 @@ function parseParams(sp: Record<string, string | string[] | undefined>): Params 
 // Public home page: the leaderboard. No login needed.
 export default function HomePage({ searchParams }: PageProps<"/">) {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-primary-strong">{t.common.appName}</h1>
-          <p className="text-sm text-muted-foreground">{t.home.tagline}</p>
-        </div>
-        <Suspense fallback={null}>
-          <AuthLinks />
-        </Suspense>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <header className="grid gap-1">
+        <h1 className="text-h1">{t.leaderboard.title}</h1>
+        <p className="text-small text-muted-foreground">{t.home.tagline}</p>
       </header>
-      <Suspense fallback={<LoadingState />}>
+      <Suspense fallback={<ListSkeleton />}>
         <LeaderboardSection searchParams={searchParams} />
       </Suspense>
-    </main>
-  );
-}
-
-async function AuthLinks() {
-  const user = await getCurrentUser();
-  if (user) {
-    return (
-      <Button asChild variant="outline" size="lg">
-        <Link href="/dashboard">{t.home.dashboard}</Link>
-      </Button>
-    );
-  }
-  return (
-    <div className="flex gap-2">
-      <Button asChild variant="outline" size="lg">
-        <Link href="/login">{t.home.login}</Link>
-      </Button>
-      <Button asChild size="lg">
-        <Link href="/signup">{t.home.signup}</Link>
-      </Button>
     </div>
   );
 }
@@ -122,26 +94,17 @@ async function LeaderboardSection({ searchParams }: { searchParams: PageProps<"/
                   href={`/students/${row.student_id}`}
                   className="block rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
-                  <Card className="py-3 transition-colors hover:bg-primary-soft">
-                    <CardContent className="flex items-center gap-3 px-3">
-                      <span
-                        className={
-                          row.rank <= 3
-                            ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
-                            : "flex size-8 shrink-0 items-center justify-center text-sm font-semibold text-muted-foreground"
-                        }
-                        aria-label={format(t.leaderboard.rank, { rank: row.rank })}
-                      >
-                        {row.rank}
-                      </span>
+                  <Card interactive className="py-3">
+                    <CardContent className="flex items-center gap-3 px-3 sm:px-4">
+                      <RankBadge rank={row.rank} />
                       <StudentAvatar name={row.full_name} url={row.photo_url} />
                       <div className="grid min-w-0 flex-1">
                         <span className="truncate font-medium">{row.full_name}</span>
                         {row.faculty ? (
-                          <span className="truncate text-sm text-muted-foreground">{row.faculty}</span>
+                          <span className="truncate text-small text-muted-foreground">{row.faculty}</span>
                         ) : null}
                       </div>
-                      <span className="shrink-0 text-right font-semibold text-primary-strong">
+                      <span className="shrink-0 text-right font-semibold text-primary-strong tabular">
                         {format(t.leaderboard.points, { points: row.total_points })}
                       </span>
                     </CardContent>
@@ -180,14 +143,11 @@ function EmptyState({ board, filtered }: { board: Leaderboard; filtered: boolean
       ? t.leaderboard.emptyAll
       : format(t.leaderboard.emptyYear, { year: academicYearLabel(board.academic_year) });
   return (
-    <Card>
-      <CardContent className="grid gap-1 py-2 text-center">
-        <p>{text}</p>
-        {!filtered && board.academic_year !== "all" ? (
-          <p className="text-sm text-muted-foreground">{t.leaderboard.emptyYearHint}</p>
-        ) : null}
-      </CardContent>
-    </Card>
+    <EmptyCard
+      icon={Trophy}
+      text={text}
+      hint={!filtered && board.academic_year !== "all" ? t.leaderboard.emptyYearHint : undefined}
+    />
   );
 }
 
@@ -214,7 +174,7 @@ async function MyRank({ board, filtered }: { board: Leaderboard; filtered: boole
   }
 
   return (
-    <div className="rounded-lg border border-primary bg-primary-soft px-3 py-2 text-sm" aria-live="polite">
+    <div className="rounded-xl border border-primary bg-primary-soft px-4 py-3 text-small" aria-live="polite">
       <span className="font-semibold">{t.leaderboard.myRankTitle}: </span>
       {text}
     </div>

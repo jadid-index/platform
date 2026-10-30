@@ -9,7 +9,7 @@ import { LoadingState } from "@/components/loading-state";
 import { checkReviewerPage } from "@/components/reviewer-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ds";
 import { achievementTypeName, format, formatAge, formatDate, t } from "@/i18n";
 import {
   createProofReadUrl,
@@ -31,14 +31,14 @@ const FILE_URL_MINUTES = 10;
 
 export default function ReviewSubmissionPage({ params }: PageProps<"/review/[id]">) {
   return (
-    <main className="grid gap-4">
+    <div className="grid gap-4">
       <Link href="/review" className="w-fit text-sm text-primary-strong underline-offset-4 hover:underline">
         ← {t.review.backToQueue}
       </Link>
       <Suspense fallback={<LoadingState />}>
         <ReviewLoader params={params} />
       </Suspense>
-    </main>
+    </div>
   );
 }
 

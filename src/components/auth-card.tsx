@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { t } from "@/i18n";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ds";
 
-// Mobile-first page frame for the auth screens.
+// Centered single-card frame for the auth and form screens, inside the app shell.
 export function AuthCard({
   title,
   description,
@@ -14,15 +13,14 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <main className="flex flex-1 flex-col items-center px-4 py-6 sm:py-12">
-      <p className="mb-4 text-sm font-semibold text-primary-strong">{t.common.appName}</p>
+    <div className="flex flex-col items-center sm:py-6">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-xl">{title}</CardTitle>
+          <h1 className="text-h1">{title}</h1>
           {description ? <CardDescription>{description}</CardDescription> : null}
         </CardHeader>
         <CardContent>{children}</CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

@@ -5,31 +5,33 @@
 /*
  * Jadid Index palette: soft pastels, sage/mint green primary. Light mode only for now.
  * This is the only place colors are defined. Components use the token classes
- * (bg-primary, text-muted-foreground, bg-status-pending, ...) and never raw hex values.
+ * (bg-primary, text-muted-foreground, bg-status-pending, bg-rank-gold, ...) and never raw hex values.
  *
- * Contrast notes (WCAG AA, 4.5:1 for normal text):
- * - primary-foreground on primary: about 7.3:1
- * - text on surface: about 12:1, muted-foreground on surface: about 5:1
- * - primary-strong on surface (links, small green text): about 6:1
- * - each status-*-foreground on its status fill: above 7:1
- * Pastel fills (primary-soft, status fills) are backgrounds only, never small text.
+ * Contrast (WCAG AA needs 4.5:1 for normal text):
+ * - primary-foreground on primary: 8.1:1
+ * - primary-strong-foreground (white) on primary-strong: 6.5:1 (the "strong" button)
+ * - primary-strong on surface 6.0:1, on surface-raised 6.5:1, on primary-soft 5.6:1 (links, small green text)
+ * - text on surface 12.7:1, muted-foreground on surface 5.3:1 and on muted 5.1:1
+ * - every status / category / rank foreground on its own fill: 6.8:1 or more
+ * Pastel fills (primary-soft, status, category, rank) are backgrounds only, never small text on their own.
  */
 :root {
   --radius: 0.75rem;
 
   /* Brand */
-  --primary: #8fcba3;              /* sage / mint green: buttons, active states */
-  --primary-foreground: #173323;   /* dark green text on primary */
-  --primary-soft: #e3f2e7;         /* light green fill: chips, highlights */
-  --primary-strong: #2f6b47;       /* green for links, icons and small text on light surfaces */
+  --primary: #9dd3ae;                  /* sage / mint green: buttons, active states */
+  --primary-foreground: #173323;       /* dark green text on primary */
+  --primary-soft: #e4f3e8;             /* light green fill: chips, highlights, active nav */
+  --primary-strong: #2c6a45;           /* green for links, icons, small text and AA-critical buttons */
+  --primary-strong-foreground: #ffffff;
 
   /* Neutrals */
-  --surface: #faf8f3;              /* warm off-white page background */
-  --surface-raised: #fffdf9;       /* cards, popovers */
-  --text: #24332b;                 /* dark green-grey, never pure black */
-  --muted: #eef1ea;                /* subtle fills */
-  --muted-foreground: #5e6e64;     /* secondary text */
-  --border: #d5ded3;               /* soft grey-green */
+  --surface: #f8f7f2;                  /* warm off-white page background */
+  --surface-raised: #ffffff;           /* cards, popovers, sidebar */
+  --text: #22312a;                     /* dark green-grey, never pure black */
+  --muted: #eef2ec;                    /* subtle fills */
+  --muted-foreground: #5a6a60;         /* secondary text */
+  --border: #dde5da;                   /* soft grey-green, thin */
 
   /* Status: always paired with a label or icon */
   --status-pending: #fbefd5;
@@ -39,9 +41,30 @@
   --status-rejected: #f8dedf;
   --status-rejected-foreground: #7a2e36;
 
+  /* Rubric categories: soft tints with dark text */
+  --category-scientific: #dcefe2;
+  --category-scientific-foreground: #1f4d33;
+  --category-innovation: #ebe4f7;
+  --category-innovation-foreground: #45306e;
+  --category-social: #fbe5d6;
+  --category-social-foreground: #6e3a1e;
+  --category-personal: #d8f0ec;
+  --category-personal-foreground: #14514c;
+
+  /* Leaderboard places 1-3: soft fills with dark text, always shown with the number */
+  --rank-gold: #f6e7b8;
+  --rank-gold-foreground: #5c4300;
+  --rank-silver: #e6e9ea;
+  --rank-silver-foreground: #3a4146;
+  --rank-bronze: #f1dccb;
+  --rank-bronze-foreground: #5e3417;
+
   /* Errors (form messages, destructive actions) */
   --destructive: #a23b47;
   --destructive-foreground: #ffffff;
+
+  /* Soft green-grey shadow, used on hover only */
+  --card-hover-shadow: 0 6px 20px -8px rgb(34 49 42 / 0.18), 0 2px 6px -2px rgb(34 49 42 / 0.08);
 
   /* shadcn/ui aliases, mapped onto the palette above */
   --background: var(--surface);
@@ -59,13 +82,36 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Type scale: display (hero), h1, h2, body, small */
+  --text-display: 2.25rem;
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 700;
+  --text-h1: 1.625rem;
+  --text-h1--line-height: 1.25;
+  --text-h1--letter-spacing: -0.015em;
+  --text-h1--font-weight: 650;
+  --text-h2: 1.1875rem;
+  --text-h2--line-height: 1.35;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h2--font-weight: 600;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.45;
+
+  /* Max content width on desktop (about 1200 px): max-w-content */
+  --container-content: 75rem;
+
+  --shadow-card-hover: var(--card-hover-shadow);
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
   --color-primary-strong: var(--primary-strong);
+  --color-primary-strong-foreground: var(--primary-strong-foreground);
 
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
@@ -80,6 +126,22 @@
   --color-status-approved-foreground: var(--status-approved-foreground);
   --color-status-rejected: var(--status-rejected);
   --color-status-rejected-foreground: var(--status-rejected-foreground);
+
+  --color-category-scientific: var(--category-scientific);
+  --color-category-scientific-foreground: var(--category-scientific-foreground);
+  --color-category-innovation: var(--category-innovation);
+  --color-category-innovation-foreground: var(--category-innovation-foreground);
+  --color-category-social: var(--category-social);
+  --color-category-social-foreground: var(--category-social-foreground);
+  --color-category-personal: var(--category-personal);
+  --color-category-personal-foreground: var(--category-personal-foreground);
+
+  --color-rank-gold: var(--rank-gold);
+  --color-rank-gold-foreground: var(--rank-gold-foreground);
+  --color-rank-silver: var(--rank-silver);
+  --color-rank-silver-foreground: var(--rank-silver-foreground);
+  --color-rank-bronze: var(--rank-bronze);
+  --color-rank-bronze-foreground: var(--rank-bronze-foreground);
 
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
@@ -109,6 +171,11 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-body text-foreground;
   }
+}
+
+/* Score columns and counters: digits line up. */
+@utility tabular {
+  font-variant-numeric: tabular-nums;
 }

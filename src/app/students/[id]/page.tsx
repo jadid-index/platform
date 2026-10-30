@@ -3,11 +3,10 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { z } from "zod";
 
-import { ErrorState } from "@/components/error-state";
+import { Card, CardContent, EmptyState, ErrorState, SectionHeader } from "@/components/ds";
 import { LoadingState } from "@/components/loading-state";
 import { StudentAvatar } from "@/components/student-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import { achievementTypeName, format, formatDate, t } from "@/i18n";
 import { getPublicStudent } from "@/lib/db";
 import type { PublicStudent } from "@/lib/types";
@@ -17,14 +16,14 @@ export const metadata: Metadata = { title: `${t.leaderboard.title} · ${t.common
 // Public profile: name, faculty, score and approved works. Never files.
 export default function StudentPage({ params }: PageProps<"/students/[id]">) {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <Link href="/" className="w-fit text-sm text-primary-strong underline-offset-4 hover:underline">
         ← {t.leaderboard.back}
       </Link>
       <Suspense fallback={<LoadingState />}>
         <StudentLoader params={params} />
       </Suspense>
-    </main>
+    </div>
   );
 }
 
@@ -54,13 +53,13 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
         <CardContent className="flex items-center gap-4 px-4">
           <StudentAvatar name={student.full_name} url={student.photo_url} className="size-16 text-lg" />
           <div className="grid min-w-0 flex-1 gap-0.5">
-            <h1 className="text-lg font-semibold break-words">{student.full_name}</h1>
+            <h1 className="text-h2 break-words">{student.full_name}</h1>
             <p className="text-sm text-muted-foreground">
               {[student.faculty, student.university].filter(Boolean).join(" · ")}
             </p>
             <p className="text-sm">
               {t.leaderboard.totalAllTime}:{" "}
-              <span className="font-semibold text-primary-strong">
+              <span className="font-semibold text-primary-strong tabular">
                 {format(t.leaderboard.points, { points: student.total_points })}
               </span>
             </p>
@@ -69,13 +68,9 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
       </Card>
 
       <section className="grid gap-3" aria-labelledby="works-title">
-        <h2 id="works-title" className="text-lg font-semibold">
-          {t.leaderboard.worksTitle}
-        </h2>
+        <SectionHeader id="works-title" title={t.leaderboard.worksTitle} />
         {student.works.length === 0 ? (
-          <Card>
-            <CardContent className="py-2 text-center text-muted-foreground">{t.leaderboard.noWorks}</CardContent>
-          </Card>
+          <EmptyState text={t.leaderboard.noWorks} />
         ) : (
           <ul className="grid gap-2">
             {student.works.map((w, i) => (
@@ -84,7 +79,7 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
                   <CardContent className="grid gap-1 px-4">
                     <div className="flex items-start justify-between gap-3">
                       <p className="font-medium break-words">{w.title}</p>
-                      <span className="shrink-0 font-semibold text-primary-strong">+{w.points_awarded}</span>
+                      <span className="shrink-0 font-semibold text-primary-strong tabular">+{w.points_awarded}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       {w.type_id ? achievementTypeName(w.type_id, w.type_name) : w.type_name} · {t.levels[w.level]}

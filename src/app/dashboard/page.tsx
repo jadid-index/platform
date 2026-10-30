@@ -4,11 +4,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { ErrorState } from "@/components/error-state";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  ErrorState,
+  ListSkeleton,
+  SectionHeader,
+  StatTile,
+} from "@/components/ds";
 import { LoadingState } from "@/components/loading-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { academicYearLabel, achievementTypeName, format, formatDate, t } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -21,28 +30,18 @@ import {
 } from "@/lib/db";
 import type { OwnSubmission } from "@/lib/types";
 
-import { LogoutButton } from "./logout-button";
-import { ReviewLink } from "./review-link";
 import { WithdrawButton } from "./withdraw-button";
 
 export const metadata: Metadata = { title: `${t.dashboard.title} · ${t.common.appName}` };
 
 export default function DashboardPage() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">{t.dashboard.title}</h1>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Suspense fallback={null}>
-            <ReviewLink />
-          </Suspense>
-          <LogoutButton />
-        </div>
-      </header>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <SectionHeader as="h1" title={t.dashboard.title} />
       <Suspense fallback={<LoadingState />}>
         <DashboardContent />
       </Suspense>
-    </main>
+    </div>
   );
 }
 
@@ -73,7 +72,7 @@ async function DashboardContent() {
       <Card>
         <CardHeader>
           <CardTitle>{format(t.dashboard.greeting, { name: profile.full_name })}</CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-small text-muted-foreground">
             {[profile.faculty, profile.course ? format(t.form.courseOption, { n: profile.course }) : null]
               .filter(Boolean)
               .join(" · ")}
@@ -81,23 +80,14 @@ async function DashboardContent() {
         </CardHeader>
         <CardContent className="flex flex-wrap items-end justify-between gap-4">
           {/* This year's points match the default leaderboard tab; the all-time total matches "Barcha yillar". */}
-          <dl className="flex gap-6">
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                {format(t.dashboard.yearPoints, { year: academicYearLabel(currentYear) })}
-              </dt>
-              <dd className="text-4xl font-semibold text-primary-strong">
-                {yearPoints}{" "}
-                <span className="text-base font-normal text-muted-foreground">{t.dashboard.pointsUnit}</span>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">{t.dashboard.allTimePoints}</dt>
-              <dd className="text-4xl font-semibold">
-                {totalPoints}{" "}
-                <span className="text-base font-normal text-muted-foreground">{t.dashboard.pointsUnit}</span>
-              </dd>
-            </div>
+          <dl className="grid flex-1 grid-cols-2 gap-3 sm:max-w-md">
+            <StatTile
+              emphasis
+              label={format(t.dashboard.yearPoints, { year: academicYearLabel(currentYear) })}
+              value={yearPoints}
+              unit={t.dashboard.pointsUnit}
+            />
+            <StatTile label={t.dashboard.allTimePoints} value={totalPoints} unit={t.dashboard.pointsUnit} />
           </dl>
           {profile.role === "student" ? (
             <Button asChild size="lg">
@@ -111,10 +101,8 @@ async function DashboardContent() {
       </Card>
 
       <section className="grid gap-3" aria-labelledby="my-submissions">
-        <h2 id="my-submissions" className="text-lg font-semibold">
-          {t.dashboard.mySubmissions}
-        </h2>
-        <Suspense fallback={<LoadingState />}>
+        <SectionHeader id="my-submissions" title={t.dashboard.mySubmissions} />
+        <Suspense fallback={<ListSkeleton rows={3} />}>
           <SubmissionList studentId={user.id} />
         </Suspense>
       </section>
@@ -133,17 +121,17 @@ async function SubmissionList({ studentId }: { studentId: string }) {
 
   if (submissions.length === 0) {
     return (
-      <Card>
-        <CardContent className="grid gap-4 py-2 text-center">
-          <p className="text-muted-foreground">{t.dashboard.empty}</p>
+      <EmptyState
+        text={t.dashboard.empty}
+        action={
           <Button asChild variant="outline" size="lg">
             <Link href="/achievements/new">
               <Plus aria-hidden />
               {t.dashboard.addAchievement}
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     );
   }
 
@@ -156,7 +144,7 @@ async function SubmissionList({ studentId }: { studentId: string }) {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <StatusBadge status={s.status} />
                 {s.status === "approved" && s.points_awarded !== null ? (
-                  <span className="text-sm font-semibold text-primary-strong">
+                  <span className="text-small font-semibold text-primary-strong tabular">
                     {format(t.dashboard.pointsAwarded, { points: s.points_awarded })}
                   </span>
                 ) : null}
