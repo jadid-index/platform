@@ -2,6 +2,7 @@ import "server-only";
 
 import { cacheLife, cacheTag } from "next/cache";
 
+import { recognitionChecks } from "@/lib/recognition";
 import { getAdminClient } from "@/lib/supabase/admin";
 import type {
   AchievementType,
@@ -14,6 +15,7 @@ import type {
   PointsPreview,
   PublicStudent,
   PublicWork,
+  RejectedSubmission,
   ReviewQueueItem,
   RubricRow,
   SubmissionForReview,
@@ -429,12 +431,27 @@ async function typeNames(): Promise<Map<number, string>> {
 
 type StudentEmbed = { id: string; full_name: string; course: number | null; faculties: { name: string } | null };
 
-// Pending submissions, oldest first.
+// Recognition checks marked "check" (same code as the review screen). null when there is nothing to compare:
+// no AI result, or the AI found none of the name, date and certificate number on the document.
+function flagCount(extraction: unknown, profileName: string, achievementDate: string, certificateRef: string | null) {
+  if (!extraction) return null;
+  const checks = recognitionChecks(extraction as Parameters<typeof recognitionChecks>[0], {
+    profile_name: profileName,
+    achievement_date: achievementDate,
+    certificate_ref: certificateRef,
+  });
+  if (checks.every((c) => c.status === "missing")) return null;
+  return checks.filter((c) => c.status === "check").length;
+}
+
+// Pending submissions, oldest first, each with its flag count (see flagCount).
 export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
   const [subs, names] = await Promise.all([
     getAdminClient()
       .from("submissions")
-      .select("id, title, type_id, level, result, submitted_at, profiles(id, full_name, course, faculties(name))")
+      .select(
+        "id, title, type_id, level, result, submitted_at, achievement_date, certificate_ref, ai_extraction, profiles(id, full_name, course, faculties(name))",
+      )
       .eq("status", "pending")
       .order("submitted_at", { ascending: true }),
     typeNames(),
@@ -452,6 +469,7 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
       submitted_at: s.submitted_at,
       student_name: student?.full_name ?? "",
       faculty: student?.faculties?.name ?? null,
+      flag_count: flagCount(s.ai_extraction, student?.full_name ?? "", s.achievement_date, s.certificate_ref),
     };
   });
 }
@@ -716,11 +734,119 @@ export async function getPublicStudent(studentId: string): Promise<PublicStudent
   };
 }
 
+// Date of each student's most recent approved work in the given academic year (achievement_date from
+// public_works, which the consent notice makes public). The approval date itself is not public, so it is
+// never shown. A work belongs to the academic year of its achievement_date (SQL academic_year(): 1 September).
+export async function getLatestWorkDates(studentIds: string[], year: LeaderboardYear): Promise<Record<string, string>> {
+  "use cache: remote";
+  cacheTag(LEADERBOARD_TAG);
+  cacheLife(LEADERBOARD_CACHE);
+
+  if (studentIds.length === 0) return {};
+  let query = getAdminClient().from("public_works").select("student_id, achievement_date").in("student_id", studentIds);
+  if (year !== "all") query = query.gte("achievement_date", `${year}-09-01`).lt("achievement_date", `${year + 1}-09-01`);
+  const { data, error } = await query;
+  if (error) throw error;
+  const latest: Record<string, string> = {};
+  for (const w of (data ?? []) as { student_id: string; achievement_date: string }[]) {
+    if (!latest[w.student_id] || w.achievement_date > latest[w.student_id]) latest[w.student_id] = w.achievement_date;
+  }
+  return latest;
+}
+
+export type PublicCounts = { students: number; approved: number; universities: number };
+
+// Landing page counters: numbers only, nothing that identifies a student. Refreshed every 5 minutes.
+// Approved works are counted for active students only, the same set the leaderboard shows.
+export async function getPublicCounts(): Promise<PublicCounts> {
+  "use cache: remote";
+  cacheLife({ stale: 300, revalidate: 300, expire: 3600 });
+
+  const db = getAdminClient();
+  const [students, approved, universities] = await Promise.all([
+    db.from("profiles").select("id", { count: "exact", head: true }).eq("role", "student").eq("status", "active"),
+    db.from("leaderboard").select("approved_count").gt("approved_count", 0),
+    db.from("universities").select("id", { count: "exact", head: true }),
+  ]);
+  if (students.error) throw students.error;
+  if (approved.error) throw approved.error;
+  if (universities.error) throw universities.error;
+  return {
+    students: students.count ?? 0,
+    approved: ((approved.data ?? []) as { approved_count: number }[]).reduce((sum, r) => sum + r.approved_count, 0),
+    universities: universities.count ?? 0,
+  };
+}
+
 // Reference data for the public filters; changes rarely.
 export async function getUniversitiesCached(): Promise<University[]> {
   "use cache";
   cacheLife("minutes");
   return listUniversitiesWithFaculties();
+}
+
+export type CategoryProgress = { code: string; points: number; cap: number };
+
+// The student's approved points per category in one academic year, next to each category's yearly cap.
+// Reads the points_awarded that approve_submission() stored (the same rows the review screen's "used" comes
+// from); nothing is computed from the rubric here. Not cached: it is per user.
+export async function getCategoryProgress(studentId: string, academicYear: number): Promise<CategoryProgress[]> {
+  const db = getAdminClient();
+  const [categories, reviews] = await Promise.all([
+    db.from("categories").select("code, yearly_cap").order("code"),
+    db
+      .from("reviews")
+      .select("category_code, points_awarded")
+      .eq("student_id", studentId)
+      .eq("decision", "approved")
+      .eq("academic_year", academicYear),
+  ]);
+  if (categories.error) throw categories.error;
+  if (reviews.error) throw reviews.error;
+  const used = new Map<string, number>();
+  for (const r of reviews.data ?? []) {
+    used.set(r.category_code as string, (used.get(r.category_code as string) ?? 0) + ((r.points_awarded as number) ?? 0));
+  }
+  return (categories.data ?? []).map((c) => ({
+    code: c.code as string,
+    points: used.get(c.code as string) ?? 0,
+    cap: c.yearly_cap as number,
+  }));
+}
+
+// Academic years in which the student has approved work, newest first (dashboard year selector).
+export async function getStudentYears(studentId: string): Promise<number[]> {
+  const { data, error } = await getAdminClient()
+    .from("leaderboard_by_year")
+    .select("academic_year")
+    .eq("student_id", studentId);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.academic_year as number).sort((a, b) => b - a);
+}
+
+// One rejected submission of the student's own, to pre-fill a resubmission. Never another student's.
+export async function getOwnRejectedSubmission(submissionId: string, studentId: string): Promise<RejectedSubmission | null> {
+  const { data, error } = await getAdminClient()
+    .from("submissions")
+    .select("id, type_id, level, result, title, issuer, achievement_date, certificate_ref, reviews(rejection_reason)")
+    .eq("id", submissionId)
+    .eq("student_id", studentId)
+    .eq("status", "rejected")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const review = (Array.isArray(data.reviews) ? data.reviews[0] : data.reviews) as { rejection_reason: string | null } | null;
+  return {
+    id: data.id as string,
+    type_id: data.type_id as number,
+    level: data.level as Level,
+    result: data.result as Result,
+    title: data.title as string,
+    issuer: data.issuer as string,
+    achievement_date: data.achievement_date as string,
+    certificate_ref: (data.certificate_ref as string | null) ?? null,
+    rejection_reason: review?.rejection_reason ?? null,
+  };
 }
 
 // The student's own points in one academic year (dashboard). Not cached: it is per user.

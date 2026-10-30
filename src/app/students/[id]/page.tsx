@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: `${t.leaderboard.title} · ${t.common
 export default function StudentPage({ params }: PageProps<"/students/[id]">) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <Link href="/" className="w-fit text-sm text-primary-strong underline-offset-4 hover:underline">
+      <Link href="/leaderboard" className="w-fit text-sm text-primary-strong underline-offset-4 hover:underline">
         ← {t.leaderboard.back}
       </Link>
       <Suspense fallback={<LoadingState />}>

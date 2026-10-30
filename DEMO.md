@@ -9,7 +9,7 @@ Live URL: `https://<your-project>.vercel.app` (fill in after the first deploy).
 - [ ] Custom SMTP is configured in Supabase, so the confirmation email arrives within seconds.
 - [ ] Two proof files on the demo phone: a real certificate PDF and a JPG photo of one, both under 10 MB.
 - [ ] At least one approved achievement dated on or after 2026-09-01, so the current-year tab is not empty.
-      Without it, the home page falls back to 2025/26 with a notice, which is fine but worth explaining.
+      Without it, the leaderboard (`/leaderboard`) falls back to 2025/26 with a notice, which is fine but worth explaining.
 - [ ] The backup video of the full path is recorded and saved offline.
 
 ## Click path (about 5 minutes)

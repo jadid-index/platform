@@ -20,7 +20,7 @@ export function RankBadge({ rank, className }: { rank: number; className?: strin
       role="img"
       aria-label={label}
       className={cn(
-        "inline-flex h-8 min-w-8 shrink-0 items-center justify-center gap-0.5 rounded-full px-2 text-small font-semibold tabular",
+        "inline-flex h-8 min-w-11 shrink-0 items-center justify-center gap-0.5 rounded-full px-2 text-small font-semibold tabular",
         medal ?? "text-muted-foreground",
         className,
       )}

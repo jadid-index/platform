@@ -4,9 +4,9 @@ import { usePathname } from "next/navigation";
 
 import { NavLinkView, type NavLinkProps } from "./nav-link-view";
 
-// "/" is also active on public profiles (they are opened from the leaderboard).
+// The leaderboard link is also active on public profiles (they are opened from the leaderboard).
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/" || pathname.startsWith("/students/");
+  if (href === "/leaderboard" && pathname.startsWith("/students/")) return true;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

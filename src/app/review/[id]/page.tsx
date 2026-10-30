@@ -91,9 +91,11 @@ async function ReviewLoader({ params }: { params: PageProps<"/review/[id]">["par
     console.error("duplicate check failed", error);
   }
 
+  // Desktop: the proof on the left (kept in view while scrolling), everything to decide with on the right.
+  // Phones: stacked, file first.
   return (
-    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-      <section className="lg:sticky lg:top-4" aria-labelledby="proof-title">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-6">
+      <section className="lg:sticky lg:top-24" aria-labelledby="proof-title">
         <Card className="gap-3 py-4">
           <CardHeader className="px-4">
             <CardTitle id="proof-title">{t.review.file}</CardTitle>
@@ -142,10 +144,18 @@ function ProofViewer({ url, path }: { url: string; path: string }) {
     <>
       {isPdf ? (
         // Some phone browsers do not render PDFs inline; the link below always works.
-        <iframe src={url} title={t.review.file} className="h-[60vh] w-full rounded-md border bg-muted lg:h-[75vh]" />
+        <iframe
+          src={url}
+          title={t.review.file}
+          className="h-[60vh] w-full rounded-md border bg-muted lg:h-[calc(100vh-15rem)]"
+        />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- signed URL, not an optimizable static asset
-        <img src={url} alt={t.review.file} className="max-h-[75vh] w-full rounded-md border object-contain" />
+        <img
+          src={url}
+          alt={t.review.file}
+          className="max-h-[60vh] w-full rounded-md border object-contain lg:max-h-[calc(100vh-15rem)]"
+        />
       )}
       <a
         href={url}

@@ -252,19 +252,19 @@ function PreviewRows({ data }: { data: PointsPreview }) {
       <dl className="grid gap-1">
         <div className="flex justify-between gap-3">
           <dt>{t.review.previewRubric}</dt>
-          <dd className="font-medium">{data.rubric_points}</dd>
+          <dd className="font-medium tabular">{data.rubric_points}</dd>
         </div>
         <div className="flex justify-between gap-3">
           <dt>
             {format(t.review.previewUsed, { year: academicYearLabel(data.academic_year) })} ({category})
           </dt>
-          <dd className="font-medium whitespace-nowrap">
+          <dd className="font-medium whitespace-nowrap tabular">
             {data.used} / {data.cap}
           </dd>
         </div>
         <div className="flex justify-between gap-3 border-t border-primary pt-1 text-base">
           <dt className="font-semibold">{t.review.previewAwarded}</dt>
-          <dd className="font-semibold text-primary-strong">{data.awarded}</dd>
+          <dd className="font-semibold text-primary-strong tabular">{data.awarded}</dd>
         </div>
       </dl>
       {data.awarded < data.rubric_points ? <p className="text-muted-foreground">{t.review.previewCapped}</p> : null}

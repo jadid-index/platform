@@ -42,6 +42,19 @@ export type OwnSubmission = {
   rejection_reason: string | null;
 };
 
+// A student's own rejected submission, used to pre-fill its resubmission. Never includes the file.
+export type RejectedSubmission = {
+  id: string;
+  type_id: number;
+  level: RubricRow["level"];
+  result: RubricRow["result"];
+  title: string;
+  issuer: string;
+  achievement_date: string;
+  certificate_ref: string | null;
+  rejection_reason: string | null;
+};
+
 export type ReviewQueueItem = {
   id: string;
   title: string;
@@ -52,6 +65,7 @@ export type ReviewQueueItem = {
   submitted_at: string;
   student_name: string;
   faculty: string | null;
+  flag_count: number | null; // recognition checks marked "check"; null when nothing could be compared
 };
 
 export type SubmissionForReview = {

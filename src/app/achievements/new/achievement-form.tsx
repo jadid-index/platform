@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Loader2, Sparkles, Wand2, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ds";
 import { Field } from "@/components/field";
 import { resolveRubric, RubricSelects, validateRubric, type RubricValue } from "@/components/rubric-selects";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { format, formatDate, t } from "@/i18n";
 import { kindFitsType } from "@/lib/document-kinds";
-import type { Meta } from "@/lib/types";
+import type { Meta, RejectedSubmission } from "@/lib/types";
 import {
   JOURNAL_ARTICLE_TYPE_NAME,
   NOTE_MAX_LENGTH,
@@ -34,7 +35,7 @@ type Values = {
   note: string;
 };
 
-type Errors = Partial<Record<keyof Values | "file", string>>;
+type Errors = Partial<Record<keyof Values | "file" | "comment", string>>;
 
 const EMPTY: Values = {
   typeId: "",
@@ -65,7 +66,27 @@ const API_ERRORS: Record<string, string> = {
   upload_expired: t.errors.uploadExpired,
   too_many_pending: t.errors.tooManyPending,
   rate_limited: t.errors.rateLimited,
+  invalid_parent: t.errors.invalidParent,
 };
+
+const COMMENT_MAX_LENGTH = 500;
+
+// A resubmission starts from the rejected submission's fields; the student checks and confirms each one.
+function initialValues(meta: Meta, parent: RejectedSubmission | null): Values {
+  if (!parent) return EMPTY;
+  const type = meta.achievement_types.find((x) => x.id === parent.type_id);
+  if (!type) return EMPTY;
+  return {
+    typeId: String(parent.type_id),
+    level: parent.level,
+    result: type.has_placement ? parent.result : "",
+    title: parent.title,
+    issuer: parent.issuer,
+    date: parent.achievement_date,
+    certificateRef: parent.certificate_ref ?? "",
+    note: "",
+  };
+}
 
 type Phase = "idle" | "uploading" | "submitting" | "done";
 
@@ -110,8 +131,10 @@ async function uploadProof(file: File): Promise<Upload | { error: string }> {
   return { submission_id: upload.submission_id, file_name: upload.file_name, path: upload.path, upload_ticket: upload.upload_ticket };
 }
 
-export function AchievementForm({ meta }: { meta: Meta }) {
-  const [values, setValues] = useState<Values>(EMPTY);
+export function AchievementForm({ meta, parent = null }: { meta: Meta; parent?: RejectedSubmission | null }) {
+  const [resubmitOf, setResubmitOf] = useState(parent);
+  const [values, setValues] = useState<Values>(() => initialValues(meta, parent));
+  const [comment, setComment] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Errors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -236,6 +259,7 @@ export function AchievementForm({ meta }: { meta: Meta }) {
     else if (values.date < meta.count_from) e.date = format(t.errors.dateTooEarly, { date: formatDate(meta.count_from) });
     if (certificateRequired && !values.certificateRef.trim()) e.certificateRef = t.errors.certificateRefRequired;
     if (values.note.length > NOTE_MAX_LENGTH) e.note = t.errors.noteTooLong;
+    if (comment.length > COMMENT_MAX_LENGTH) e.comment = t.errors.noteTooLong;
     const fe = fileError(file);
     if (fe) e.file = fe;
     return e;
@@ -276,6 +300,8 @@ export function AchievementForm({ meta }: { meta: Meta }) {
           achievement_date: values.date,
           certificate_ref: values.certificateRef || undefined,
           note: values.note || undefined,
+          parent_id: resubmitOf?.id,
+          student_comment: resubmitOf && comment.trim() ? comment : undefined,
         }),
       });
 
@@ -317,6 +343,8 @@ export function AchievementForm({ meta }: { meta: Meta }) {
   }
 
   function reset() {
+    setResubmitOf(null);
+    setComment("");
     setValues(EMPTY);
     setFile(null);
     setExtraction(null);
@@ -338,7 +366,7 @@ export function AchievementForm({ meta }: { meta: Meta }) {
 
   if (phase === "done") {
     return (
-      <div className="grid gap-4">
+      <div className="mx-auto grid w-full max-w-md gap-4">
         <Alert className="border-primary bg-primary-soft">
           <CheckCircle2 aria-hidden />
           <AlertTitle>{t.achievement.successTitle}</AlertTitle>
@@ -354,30 +382,11 @@ export function AchievementForm({ meta }: { meta: Meta }) {
     );
   }
 
-  return (
-    <form key={formKey} className="grid gap-5" noValidate onSubmit={onSubmit}>
-      <Field id="file" label={labels.file} error={errors.file} hint={labels.fileHint}>
-        <Input
-          id="file"
-          type="file"
-          className="h-10"
-          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-          disabled={busy}
-          aria-invalid={!!errors.file}
-          onChange={(e) => onFilePicked(e.target.files?.[0] ?? null)}
-        />
-      </Field>
-
-      <ReadStatus state={readState} />
-      <RubricSelects
-        types={meta.achievement_types}
-        rubric={meta.rubric_points}
-        value={rubricValue}
-        errors={errors}
-        disabled={busy}
-        onChange={(r) => setValues((v) => ({ ...v, ...r }))}
-      />
-
+  // What was read from the document, as hints the student may accept. Shown inline on phones (the current
+  // flow) and in the side panel from lg up; only one of the two is ever displayed.
+  const readStatus = <ReadStatus state={readState} />;
+  const assistant = (
+    <>
       {extraction && type && readState === "filled" ? (
         <Suggestions
           extraction={extraction.result}
@@ -417,101 +426,214 @@ export function AchievementForm({ meta }: { meta: Meta }) {
           </div>
         </div>
       ) : null}
+    </>
+  );
 
-      <Field id="title" label={labels.title} error={errors.title}>
-        <Input
-          id="title"
-          className="h-10"
-          maxLength={300}
-          placeholder={labels.titlePlaceholder}
-          value={values.title}
-          disabled={busy}
-          aria-invalid={!!errors.title}
-          onChange={(e) => set("title", e.target.value)}
-        />
-      </Field>
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start">
+      <Card className="py-5">
+        <CardContent className="px-4 sm:px-6">
+          <form key={formKey} className="grid gap-5" noValidate onSubmit={onSubmit}>
+            {resubmitOf?.rejection_reason ? (
+              <div className="flex items-start gap-2 rounded-lg border border-status-rejected-foreground/20 bg-status-rejected p-3 text-small text-status-rejected-foreground">
+                <XCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <div className="grid gap-0.5">
+                  <p className="font-semibold">{t.achievement.resubmitReason}</p>
+                  <p className="break-words whitespace-pre-line">{resubmitOf.rejection_reason}</p>
+                </div>
+              </div>
+            ) : null}
 
-      <Field id="issuer" label={labels.issuer} error={errors.issuer}>
-        <Input
-          id="issuer"
-          className="h-10"
-          maxLength={300}
-          placeholder={labels.issuerPlaceholder}
-          value={values.issuer}
-          disabled={busy}
-          aria-invalid={!!errors.issuer}
-          onChange={(e) => set("issuer", e.target.value)}
-        />
-      </Field>
+            <Field id="file" label={labels.file} error={errors.file} hint={labels.fileHint}>
+              <Input
+                id="file"
+                type="file"
+                className="h-10"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                disabled={busy}
+                aria-invalid={!!errors.file}
+                onChange={(e) => onFilePicked(e.target.files?.[0] ?? null)}
+              />
+            </Field>
 
-      <Field
-        id="date"
-        label={labels.date}
-        error={errors.date}
-        hint={format(t.achievement.dateHint, { date: formatDate(meta.count_from) })}
-      >
-        <Input
-          id="date"
-          type="date"
-          className="h-10"
-          min={meta.count_from}
-          max={today}
-          value={values.date}
-          disabled={busy}
-          aria-invalid={!!errors.date}
-          onChange={(e) => set("date", e.target.value)}
-        />
-      </Field>
+            <div className="contents lg:hidden">{readStatus}</div>
+            <RubricSelects
+              types={meta.achievement_types}
+              rubric={meta.rubric_points}
+              value={rubricValue}
+              errors={errors}
+              disabled={busy}
+              onChange={(r) => setValues((v) => ({ ...v, ...r }))}
+            />
 
-      <Field
-        id="certificateRef"
-        label={labels.certificateRef}
-        error={errors.certificateRef}
-        hint={certificateRequired ? t.achievement.certificateRefRequired : t.achievement.certificateRefHint}
-      >
-        <Input
-          id="certificateRef"
-          className="h-10"
-          maxLength={500}
-          value={values.certificateRef}
-          disabled={busy}
-          aria-invalid={!!errors.certificateRef}
-          onChange={(e) => set("certificateRef", e.target.value)}
-        />
-      </Field>
+            <div className="grid gap-5 empty:hidden lg:hidden">{assistant}</div>
 
-      <Field
-        id="note"
-        label={t.achievement.note}
-        error={errors.note}
-        hint={format(t.achievement.noteCounter, { count: values.note.length, max: NOTE_MAX_LENGTH })}
-      >
-        <Textarea
-          id="note"
-          rows={3}
-          maxLength={NOTE_MAX_LENGTH}
-          value={values.note}
-          disabled={busy}
-          aria-invalid={!!errors.note}
-          onChange={(e) => set("note", e.target.value)}
-        />
-      </Field>
+            <Field id="title" label={labels.title} error={errors.title}>
+              <Input
+                id="title"
+                className="h-10"
+                maxLength={300}
+                placeholder={labels.titlePlaceholder}
+                value={values.title}
+                disabled={busy}
+                aria-invalid={!!errors.title}
+                onChange={(e) => set("title", e.target.value)}
+              />
+            </Field>
 
+            <Field id="issuer" label={labels.issuer} error={errors.issuer}>
+              <Input
+                id="issuer"
+                className="h-10"
+                maxLength={300}
+                placeholder={labels.issuerPlaceholder}
+                value={values.issuer}
+                disabled={busy}
+                aria-invalid={!!errors.issuer}
+                onChange={(e) => set("issuer", e.target.value)}
+              />
+            </Field>
 
-      {formError ? (
-        <Alert variant="destructive">
-          <AlertDescription>{formError}</AlertDescription>
-        </Alert>
-      ) : null}
+            <Field
+              id="date"
+              label={labels.date}
+              error={errors.date}
+              hint={format(t.achievement.dateHint, { date: formatDate(meta.count_from) })}
+            >
+              <Input
+                id="date"
+                type="date"
+                className="h-10"
+                min={meta.count_from}
+                max={today}
+                value={values.date}
+                disabled={busy}
+                aria-invalid={!!errors.date}
+                onChange={(e) => set("date", e.target.value)}
+              />
+            </Field>
 
-      <Button type="submit" size="lg" className="w-full" disabled={busy}>
-        {phase === "uploading"
-          ? t.achievement.uploading
-          : phase === "submitting"
-            ? t.achievement.submitting
-            : t.achievement.submit}
-      </Button>
-    </form>
+            <Field
+              id="certificateRef"
+              label={labels.certificateRef}
+              error={errors.certificateRef}
+              hint={certificateRequired ? t.achievement.certificateRefRequired : t.achievement.certificateRefHint}
+            >
+              <Input
+                id="certificateRef"
+                className="h-10"
+                maxLength={500}
+                value={values.certificateRef}
+                disabled={busy}
+                aria-invalid={!!errors.certificateRef}
+                onChange={(e) => set("certificateRef", e.target.value)}
+              />
+            </Field>
+
+            <Field
+              id="note"
+              label={t.achievement.note}
+              error={errors.note}
+              hint={format(t.achievement.noteCounter, { count: values.note.length, max: NOTE_MAX_LENGTH })}
+            >
+              <Textarea
+                id="note"
+                rows={3}
+                maxLength={NOTE_MAX_LENGTH}
+                value={values.note}
+                disabled={busy}
+                aria-invalid={!!errors.note}
+                onChange={(e) => set("note", e.target.value)}
+              />
+            </Field>
+
+            {resubmitOf ? (
+              <Field
+                id="studentComment"
+                label={t.achievement.studentComment}
+                error={errors.comment}
+                hint={`${t.achievement.studentCommentHint} ${format(t.achievement.noteCounter, { count: comment.length, max: COMMENT_MAX_LENGTH })}`}
+              >
+                <Textarea
+                  id="studentComment"
+                  rows={3}
+                  maxLength={COMMENT_MAX_LENGTH}
+                  value={comment}
+                  disabled={busy}
+                  aria-invalid={!!errors.comment}
+                  onChange={(e) => setComment(e.target.value)}
+                />
+              </Field>
+            ) : null}
+
+            {formError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <Button type="submit" size="lg" className="w-full" disabled={busy}>
+              {phase === "uploading"
+                ? t.achievement.uploading
+                : phase === "submitting"
+                  ? t.achievement.submitting
+                  : t.achievement.submit}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <aside className="hidden gap-4 lg:sticky lg:top-24 lg:grid">
+        <SidePanel title={t.achievement.previewTitle}>
+          <FilePreview file={errors.file ? null : file} />
+        </SidePanel>
+        <SidePanel title={t.achievement.assistantTitle}>
+          {readState === "none" && !preview ? (
+            <p className="text-small text-muted-foreground">{t.achievement.assistantEmpty}</p>
+          ) : (
+            <div className="grid gap-3">
+              {readStatus}
+              {assistant}
+            </div>
+          )}
+        </SidePanel>
+      </aside>
+    </div>
+  );
+}
+
+function SidePanel({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card className="gap-3 py-4">
+      <CardHeader className="px-4">
+        <CardTitle className="text-body">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3 px-4">{children}</CardContent>
+    </Card>
+  );
+}
+
+// The picked file, read locally in the browser (nothing extra is uploaded for this).
+function FilePreview({ file }: { file: File | null }) {
+  const url = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  useEffect(() => {
+    if (!url) return;
+    return () => URL.revokeObjectURL(url);
+  }, [url]);
+
+  if (!file || !url) {
+    return (
+      <div className="flex h-48 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted/40 p-4 text-center text-small text-muted-foreground">
+        <FileText className="size-6" aria-hidden />
+        {t.achievement.previewEmpty}
+      </div>
+    );
+  }
+  return file.type === "application/pdf" ? (
+    <iframe src={url} title={file.name} className="h-[55vh] w-full rounded-lg border bg-muted" />
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element -- local object URL of the picked file
+    <img src={url} alt={file.name} className="max-h-[55vh] w-full rounded-lg border object-contain" />
   );
 }
 

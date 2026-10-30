@@ -1,11 +1,12 @@
-import { ChevronRight } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronRight, HelpCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { Card, CardContent, EmptyState, ErrorState, ListSkeleton, SectionHeader } from "@/components/ds";
+import { Card, CardContent, Chip, EmptyState, ErrorState, ListSkeleton, SectionHeader } from "@/components/ds";
 import { checkReviewerPage } from "@/components/reviewer-gate";
-import { achievementTypeName, format, formatAge, t } from "@/i18n";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { achievementTypeName, format, formatAge, formatDate, t } from "@/i18n";
 import { listReviewQueue } from "@/lib/db";
 import type { ReviewQueueItem } from "@/lib/types";
 
@@ -42,6 +43,7 @@ async function Queue() {
     );
   }
 
+  // Oldest first, as listReviewQueue returns them. Desktop: a table; phones: cards. Both open the review screen.
   return (
     <>
       <SectionHeader
@@ -49,7 +51,55 @@ async function Queue() {
         title={t.review.queueTitle}
         description={format(t.review.queueCount, { count: items.length })}
       />
-      <ul className="grid gap-3">
+
+      <div className="hidden overflow-hidden rounded-xl border bg-surface-raised lg:block">
+        <Table>
+          <TableCaption className="sr-only">{t.review.queueCaption}</TableCaption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-4">{t.review.colStudent}</TableHead>
+              <TableHead>{t.review.colType}</TableHead>
+              <TableHead>{t.review.colSubmitted}</TableHead>
+              <TableHead>{t.review.colFlags}</TableHead>
+              <TableHead className="w-10 pr-4">
+                <span className="sr-only">{t.review.open}</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((s) => (
+              // relative + the link's ::after make the whole row clickable.
+              <TableRow key={s.id} className="relative hover:bg-primary-soft/50">
+                <TableCell className="pl-4 whitespace-normal">
+                  <Link
+                    href={`/review/${s.id}`}
+                    className="font-medium outline-none after:absolute after:inset-0 hover:underline focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+                  >
+                    {s.student_name}
+                  </Link>
+                  {s.faculty ? <div className="text-small text-muted-foreground">{s.faculty}</div> : null}
+                </TableCell>
+                <TableCell className="max-w-md whitespace-normal">
+                  <div className="truncate">{s.title}</div>
+                  <div className="text-small text-muted-foreground">{typeLine(s)}</div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap">
+                  <div className="tabular">{formatDate(s.submitted_at)}</div>
+                  <div className="text-small text-muted-foreground">{formatAge(s.submitted_at)}</div>
+                </TableCell>
+                <TableCell>
+                  <FlagChip count={s.flag_count} />
+                </TableCell>
+                <TableCell className="pr-4">
+                  <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <ul className="grid gap-3 lg:hidden">
         {items.map((s) => (
           <li key={s.id}>
             <Link
@@ -63,12 +113,10 @@ async function Queue() {
                       <span className="font-medium">{s.student_name}</span>
                       <span className="text-xs text-muted-foreground">{formatAge(s.submitted_at)}</span>
                     </div>
-                    {s.faculty ? <span className="text-sm text-muted-foreground">{s.faculty}</span> : null}
+                    {s.faculty ? <span className="text-small text-muted-foreground">{s.faculty}</span> : null}
                     <span className="truncate">{s.title}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {achievementTypeName(s.type_id, s.type_name)} · {t.levels[s.level]}
-                      {s.result !== "confirmed" ? ` · ${t.results[s.result]}` : ""}
-                    </span>
+                    <span className="text-small text-muted-foreground">{typeLine(s)}</span>
+                    <FlagChip count={s.flag_count} className="mt-1 w-fit" />
                   </div>
                   <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-label={t.review.open} />
                 </CardContent>
@@ -78,5 +126,37 @@ async function Queue() {
         ))}
       </ul>
     </>
+  );
+}
+
+function typeLine(s: ReviewQueueItem): string {
+  return `${achievementTypeName(s.type_id, s.type_name)} · ${t.levels[s.level]}${
+    s.result !== "confirmed" ? ` · ${t.results[s.result]}` : ""
+  }`;
+}
+
+// Recognition checks that need a look. Icon and words, never colour alone.
+function FlagChip({ count, className }: { count: number | null; className?: string }) {
+  if (count === null) {
+    return (
+      <Chip tone="muted" className={className}>
+        <HelpCircle aria-hidden />
+        {t.review.flagsNoData}
+      </Chip>
+    );
+  }
+  if (count === 0) {
+    return (
+      <Chip tone="approved" className={className}>
+        <CheckCircle2 aria-hidden />
+        {t.review.flagsNone}
+      </Chip>
+    );
+  }
+  return (
+    <Chip tone="pending" className={className}>
+      <AlertTriangle aria-hidden />
+      {format(t.review.flagsCount, { n: count })}
+    </Chip>
   );
 }

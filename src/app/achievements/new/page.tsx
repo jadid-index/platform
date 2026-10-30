@@ -2,60 +2,89 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { z } from "zod";
 
-import { AuthCard } from "@/components/auth-card";
-import { ErrorState } from "@/components/error-state";
+import { ErrorState, SectionHeader } from "@/components/ds";
 import { LoadingState } from "@/components/loading-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { t } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
-import { getMeta, getProfileAccess } from "@/lib/db";
-import type { Meta } from "@/lib/types";
+import { getMeta, getOwnRejectedSubmission, getProfileAccess } from "@/lib/db";
+import type { Meta, RejectedSubmission } from "@/lib/types";
 
 import { AchievementForm } from "./achievement-form";
 
 export const metadata: Metadata = { title: `${t.achievement.title} · ${t.common.appName}` };
 
-export default function NewAchievementPage() {
+// Desktop: the form beside the file preview and what was read from the document. Phones: one column, as before.
+export default function NewAchievementPage({ searchParams }: PageProps<"/achievements/new">) {
   return (
-    <AuthCard title={t.achievement.title} description={t.achievement.subtitle}>
-      <Link href="/dashboard" className="mb-4 inline-block text-sm text-primary-strong underline-offset-4 hover:underline">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+      <Link href="/dashboard" className="w-fit text-sm text-primary-strong underline-offset-4 hover:underline">
         ← {t.achievement.back}
       </Link>
       <Suspense fallback={<LoadingState />}>
-        <AchievementLoader />
+        <AchievementLoader searchParams={searchParams} />
       </Suspense>
-    </AuthCard>
+    </div>
   );
 }
 
-async function AchievementLoader() {
+async function AchievementLoader({ searchParams }: { searchParams: PageProps<"/achievements/new">["searchParams"] }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const resubmitId = z.uuid().safeParse((await searchParams).resubmit);
+
   let meta: Meta;
   let access: Awaited<ReturnType<typeof getProfileAccess>>;
+  let parent: RejectedSubmission | null = null;
   try {
-    [meta, access] = await Promise.all([getMeta(), getProfileAccess(user.id)]);
+    [meta, access, parent] = await Promise.all([
+      getMeta(),
+      getProfileAccess(user.id),
+      // Only the student's own rejected submission; anything else opens an empty form.
+      resubmitId.success ? getOwnRejectedSubmission(resubmitId.data, user.id) : Promise.resolve(null),
+    ]);
   } catch (error) {
     console.error("load achievement form failed", error);
     return <ErrorState message={t.achievement.metaError} />;
   }
   if (!access) redirect("/onboarding");
+
+  const header = (
+    <SectionHeader
+      as="h1"
+      title={parent ? t.achievement.resubmitTitle : t.achievement.title}
+      description={parent ? t.achievement.resubmitIntro : t.achievement.subtitle}
+    />
+  );
+
   if (access.role !== "student" || access.status !== "active") {
     return (
-      <Alert>
-        <AlertDescription>{t.errors.profileNotActive}</AlertDescription>
-      </Alert>
+      <>
+        {header}
+        <Alert>
+          <AlertDescription>{t.errors.profileNotActive}</AlertDescription>
+        </Alert>
+      </>
     );
   }
   if (meta.achievement_types.length === 0) {
     return (
-      <Alert>
-        <AlertDescription>{t.achievement.noTypes}</AlertDescription>
-      </Alert>
+      <>
+        {header}
+        <Alert>
+          <AlertDescription>{t.achievement.noTypes}</AlertDescription>
+        </Alert>
+      </>
     );
   }
 
-  return <AchievementForm meta={meta} />;
+  return (
+    <>
+      {header}
+      <AchievementForm key={parent?.id ?? "new"} meta={meta} parent={parent} />
+    </>
+  );
 }
