@@ -45,7 +45,7 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
 ## UI
 
 - Language: Uzbek (Latin) is the default. Put all text in a translations file so Russian and English can be added.
-- Mobile first. Students will use phones. Test every screen at 375 px wide.
+- Mobile first, with a full desktop layout from the lg breakpoint up. Test every screen at 375 px and at 1440 px wide.
 - Colors: a soft pastel palette with **green as the primary color**. No blue or gold branding.
   Define the palette once as Tailwind theme tokens (primary, primary-soft, surface, border, text, muted, plus status colors).
   No hard-coded hex values in components.
