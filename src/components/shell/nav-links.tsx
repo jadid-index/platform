@@ -19,6 +19,7 @@ function Group({ title, children }: { title?: string; children: React.ReactNode 
 export function NavLinksFallback() {
   return (
     <Group>
+      <NavLinkView href="/" label={t.nav.home} icon="home" />
       <NavLinkView href="/leaderboard" label={t.nav.leaderboard} icon="leaderboard" />
     </Group>
   );
@@ -34,6 +35,7 @@ export async function NavLinks() {
   return (
     <>
       <Group>
+        <NavItem href="/" label={t.nav.home} icon="home" />
         <NavItem href="/leaderboard" label={t.nav.leaderboard} icon="leaderboard" />
       </Group>
       {viewer.kind === "no-profile" ? (

@@ -9,6 +9,7 @@ export const uz = {
   },
   nav: {
     main: "Asosiy menyu",
+    home: "Bosh sahifa",
     leaderboard: "Reyting",
     groupStudent: "Talaba",
     myAchievements: "Mening yutuqlarim",

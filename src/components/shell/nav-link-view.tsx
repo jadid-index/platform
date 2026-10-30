@@ -1,9 +1,10 @@
-import { Award, ClipboardCheck, PlusCircle, Trophy, UserRoundCheck, type LucideIcon } from "lucide-react";
+import { Award, ClipboardCheck, House, PlusCircle, Trophy, UserRoundCheck, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
 const ICONS = {
+  home: House,
   leaderboard: Trophy,
   achievements: Award,
   add: PlusCircle,
