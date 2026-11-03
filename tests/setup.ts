@@ -12,3 +12,8 @@ if (process.env.NODE_ENV === "production") throw new Error("Refusing to run test
 
 // "use cache" only works inside Next; outside it the cache helpers become no-ops and every call hits the database.
 vi.mock("next/cache", () => ({ cacheTag: () => {}, cacheLife: () => {}, revalidateTag: () => {} }));
+// connection() marks a route handler as per-request in Next; outside a request scope it throws, so it is a no-op here.
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  connection: async () => {},
+}));

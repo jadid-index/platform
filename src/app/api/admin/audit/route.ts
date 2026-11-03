@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 
 import { apiError } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth";
@@ -7,6 +7,8 @@ import { adminAuditQuerySchema } from "@/lib/validation";
 
 // Admin only, read-only. Query: actor (name, email or id), action, from, to (YYYY-MM-DD, Tashkent days), limit, offset.
 export async function GET(request: Request) {
+  // Per request, never prerendered at build time (it reads the session cookies).
+  await connection();
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return apiError(auth.status, auth.error);

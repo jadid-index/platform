@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { connection, NextResponse } from "next/server";
 
 import { apiError } from "@/lib/api";
 import { requireAdmin } from "@/lib/auth";
@@ -7,6 +7,8 @@ import { adminUsersQuerySchema } from "@/lib/validation";
 
 // Admin only. Query: q (name or email), role, status, limit, offset. Returns emails, so never cached.
 export async function GET(request: Request) {
+  // Per request, never prerendered at build time (it reads the session cookies).
+  await connection();
   try {
     const auth = await requireAdmin();
     if (!auth.ok) return apiError(auth.status, auth.error);
