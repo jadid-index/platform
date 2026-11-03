@@ -58,6 +58,7 @@ export async function NavLinks() {
       {isAdmin ? (
         <Group title={t.nav.groupAdmin}>
           <NavItem href="/admin/users" label={t.nav.adminUsers} icon="users" />
+          <NavItem href="/admin/rubric" label={t.nav.adminRubric} icon="rubric" />
           <NavItem href="/admin/audit" label={t.nav.adminAudit} icon="audit" />
         </Group>
       ) : null}

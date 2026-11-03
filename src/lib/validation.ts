@@ -28,8 +28,6 @@ export type Result = (typeof RESULTS)[number];
 export const PROOF_MAX_BYTES = 10 * 1024 * 1024;
 export const PROOF_CONTENT_TYPES = ["application/pdf", "image/jpeg", "image/png"] as const;
 export const NOTE_MAX_LENGTH = 300;
-// Matches the seed; certificate_ref is required for this type (SPEC section 2, rule 5).
-export const JOURNAL_ARTICLE_TYPE_NAME = "Journal article";
 
 const optionalText = (max: number) =>
   z
@@ -198,4 +196,77 @@ export function adminErrorFromSql(message: string): string {
     "invalid status": "invalid_body",
   };
   return known[message] ?? "sql_error";
+}
+
+// ------------------------------------------------------------------- rubric
+
+export const REASON_MIN = 3;
+export const REASON_MAX = 200;
+export const CAP_MAX = 1000;
+
+const reason = z.string().trim().min(REASON_MIN).max(REASON_MAX);
+const int = z.number().int();
+
+const typeName = z.object({
+  uz: z.string().trim().min(2).max(120),
+  en: z.string().trim().max(120).optional(),
+  ru: z.string().trim().max(120).optional(),
+});
+
+// Range checks against the yearly cap happen in SQL, which knows the cap at the moment of the change.
+export const typeBodySchema = z.strictObject({
+  name: typeName,
+  category_code: z.string().trim().min(1).max(40),
+  base_points: int.min(0).max(CAP_MAX),
+  has_placement: z.boolean(),
+  proof_hint: z.string().trim().max(300).optional().transform((v) => v || null),
+  certificate_ref_required: z.boolean(),
+  reason,
+});
+export type TypeBody = z.infer<typeof typeBodySchema>;
+
+export const typePatchSchema = z.union([typeBodySchema, z.strictObject({ active: z.boolean(), reason })]);
+export const reasonBodySchema = z.strictObject({ reason });
+
+export const pointsBodySchema = z.strictObject({
+  cells: z
+    .array(
+      z.strictObject({
+        type_id: int.positive(),
+        level: z.enum(LEVELS),
+        result: z.enum(RESULTS),
+        points: int.min(0).max(CAP_MAX).nullable(), // null removes the cell
+      }),
+    )
+    .min(1)
+    .max(200),
+  reason,
+});
+export type PointsCell = z.infer<typeof pointsBodySchema>["cells"][number];
+
+export const capBodySchema = z.strictObject({ yearly_cap: int.min(1).max(CAP_MAX), reason });
+
+// Maps exceptions raised by the admin rubric functions to stable API codes and HTTP statuses.
+const RUBRIC_ERRORS: Record<string, [string, number]> = {
+  "not an admin": ["forbidden", 403],
+  "reason required": ["reason_required", 400],
+  "name required": ["name_required", 400],
+  "name taken": ["name_taken", 409],
+  "invalid value": ["invalid_body", 400],
+  "invalid cell": ["invalid_cell", 400],
+  "too many cells": ["invalid_cell", 400],
+  "duplicate cell": ["duplicate_cell", 400],
+  "points out of range": ["points_out_of_range", 400],
+  "cap out of range": ["cap_out_of_range", 400],
+  "result does not fit type": ["result_mismatch", 400],
+  "category not found": ["not_found", 404],
+  "type not found": ["not_found", 404],
+  "type has submissions": ["type_has_submissions", 409],
+  "cell in use": ["cell_in_use", 409],
+  "cap below points": ["cap_below_points", 409],
+};
+
+export function rubricErrorFromSql(message: string): { code: string; status: number } {
+  const known = RUBRIC_ERRORS[message];
+  return known ? { code: known[0], status: known[1] } : { code: "sql_error", status: 500 };
 }

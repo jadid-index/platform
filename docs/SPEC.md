@@ -9,7 +9,8 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
   only on the server. If you are not on Supabase, replace `auth.users`, `auth.uid()` and the RLS block.
 - Sign-in: email + password, and "Continue with Google" (OAuth, PKCE). Google users have no profile row until
   they finish `/onboarding` (name, university, faculty, course, consent), which calls `POST /api/profile`.
-- Files: `schema.sql`, then `seed.sql` (generated from the v0.3 rubric workbook).
+- Files: `schema.sql`, then `seed.sql` (generated from the v0.3 rubric workbook). Both the workbook and `seed.sql` stay as
+  the original seed. After the first edit on `/admin/rubric` the database is the source of truth for the rubric.
 - Pilot sign-up is open: any email, no email verification (team decision, 24 Oct, temporary). The
   `allowed_email_domains` table (seeded with `iiau.uz`) and `profiles.status` stay in the schema for the later
   identity verification (university email, HEMIS / student ID), but are not enforced now.
@@ -39,6 +40,12 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = 
 | GET | `/api/admin/users` | A | Query: `q` (name or email), `role`, `status`, `limit` (max 200), `offset`. Returns `rows` (id, full_name, email, role, status, university, faculty, created_at) and `total`. `Cache-Control: no-store`. |
 | PATCH | `/api/admin/users/:id` | A | Body `{ role }` or `{ status: "active" \| "hidden" }`, exactly one. Calls `admin_set_role()` / `admin_set_status()`. Returns `{ old, new, changed }`. Errors: 409 `last_admin`, 409 `student_fields_missing`, 404 `not_found`. |
 | GET | `/api/admin/audit` | A | Query: `actor` (name, email or id), `action`, `from`, `to` (YYYY-MM-DD, Tashkent days, inclusive), `limit`, `offset`. Read-only. Returns `rows`, `total`, `actions`. |
+| GET | `/api/admin/rubric` | A | Categories with caps, every type (inactive included, with `in_use`) and every points cell. |
+| POST | `/api/admin/rubric/types` | A | Body: `name {uz, en?}, category_code, base_points, has_placement, proof_hint?, certificate_ref_required, reason`. Creates an active type with no cells. |
+| PATCH | `/api/admin/rubric/types/:id` | A | The same body (edit), or `{ active, reason }`. `has_placement` can change only while no submission uses the type (its cells are removed). |
+| DELETE | `/api/admin/rubric/types/:id` | A | Body `{ reason }`. Only a type no submission or review refers to; otherwise deactivate it. |
+| PUT | `/api/admin/rubric/points` | A | Body `{ cells: [{ type_id, level, result, points \| null }], reason }`, up to 200, all or nothing. `null` removes an unused cell. |
+| PATCH | `/api/admin/rubric/categories/:code` | A | Body `{ yearly_cap, reason }`. |
 
 The points preview on the review screen is: rubric points for the chosen combination, points the student
 already has in that category and academic year, and points that would be awarded after the cap.
@@ -56,7 +63,8 @@ Known gap: a file uploaded in step 2 with no step 3 stays in the bucket; clean u
 2. File: PDF, JPG or PNG, 10 MB or less. Compute SHA-256 on the server. A live duplicate (unique index) returns a generic "already submitted" message.
 3. `(type_id, level, result)` must exist in `rubric_points`. For types without placement, force `result = confirmed`.
 4. `achievement_date` is not in the future and is on or after `app_settings.count_from`.
-5. `certificate_ref` is required for Journal article. Strongly encouraged for the others.
+5. `certificate_ref` is required when the type has `certificate_ref_required` (Journal article and the journal draft types). Strongly encouraged for the others.
+8. The type must be `active` (`type_inactive`). A trigger on `submissions` enforces the same in SQL.
 6. `note` is 300 characters or fewer.
 7. Resubmission after rejection: pass `parent_id` (must be the student's own rejected submission) and an optional `student_comment`.
 
@@ -106,6 +114,29 @@ select id, 'profile.role_changed', 'profile', id::text,
 ```
 
 After that, further admins and reviewers are promoted on `/admin/users`.
+
+## 3b. Rubric editor (`/admin/rubric`)
+
+- **Snapshot.** `approve_submission()` reads the cell and the cap once and stores plain integers in
+  `reviews.rubric_points` and `reviews.points_awarded` (plus `category_code`, `academic_year`). The FK from `reviews` to
+  `rubric_points` is on `(type, level, result)` only, and nothing recomputes reviews, so a rubric edit never changes
+  an awarded point or the leaderboard. Pending submissions get the rubric as it is at approval time.
+  Type names are not snapshotted: a rename shows on older works too (display only).
+- **Validation (in SQL, also in zod):** points are integers from 0 to the category's yearly cap; the result must fit
+  `has_placement` (`confirmed` vs `participant` / `finalist` / `winner`); a cap is an integer from 1 to 1000 and not below
+  any cell or base points of the category; base points 0..cap; moving a type to another category needs all its cells
+  under the new cap. Error codes: `points_out_of_range`, `result_mismatch`, `invalid_cell`, `duplicate_cell`,
+  `cap_out_of_range`, `cap_below_points`, `type_has_submissions`, `cell_in_use`, `name_taken`, `reason_required`.
+- **Audit.** Every change needs a reason (3-200 characters) and writes one `audit_log` row per change with
+  `details = { old, new, reason }`. Actions: `rubric.type_created`, `rubric.type_updated`, `rubric.type_activated`,
+  `rubric.type_deactivated`, `rubric.type_deleted`, `rubric.points_changed` (entity_id `type:level:result`), `rubric.cap_changed`.
+- **Types.** Names are `{ uz, en?, ru? }` in `achievement_types.name`, shown in the UI language (fallback `uz`). Inactive
+  types are hidden from the student form and cannot be submitted; reviewers still see them on pending work.
+- **Draft journal types** (migration `20261104000000`, inactive until an admin reviews them): 13 Scopus / Web of Science
+  indexed (international 60), 14 VAK (OAK) listed (national 30), 15 other national journal (national 12),
+  16 other international journal (international 24).
+- The fill helper on the editor computes `round(base × level multiplier × result multiplier)`, clamped to the cap,
+  shows the old → new preview and saves only after the admin confirms with a reason.
 
 ## 4. AI extraction (`POST /api/extract`)
 
@@ -183,7 +214,7 @@ Type vs document kind (warn only, never block):
 
 | Achievement type | Expected `document_kind` |
 |---|---|
-| Journal article | journal_article |
+| Journal article (and draft types 13-16) | journal_article |
 | Conference paper or abstract | conference_programme, certificate, journal_article |
 | Olympiad, Hackathon | certificate, diploma, award_letter |
 | Patent, Software registration | patent_or_registration |

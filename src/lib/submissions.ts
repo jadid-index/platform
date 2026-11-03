@@ -19,7 +19,6 @@ import {
   submissionExists,
 } from "@/lib/db";
 import {
-  JOURNAL_ARTICLE_TYPE_NAME,
   PROOF_MAX_BYTES,
   safeFileName,
   todayInTashkent,
@@ -192,6 +191,8 @@ export async function createSubmissionFromUpload(
   // 3. The combination must exist in rubric_points. Types without placement are always "confirmed".
   const type = await getAchievementType(body.type_id);
   if (!type) return reject(400, "invalid_type");
+  // Inactive types are hidden from the form and cannot be submitted (also enforced by a trigger in SQL).
+  if (!type.active) return reject(400, "type_inactive");
   const result = type.has_placement ? body.result : "confirmed";
   if (!result || !(await rubricCombinationExists(type.id, body.level, result))) {
     return reject(400, "invalid_combination");
@@ -201,8 +202,8 @@ export async function createSubmissionFromUpload(
   if (body.achievement_date > todayInTashkent()) return reject(400, "date_in_future");
   if (body.achievement_date < (await getCountFrom())) return reject(400, "date_too_early");
 
-  // 5. Certificate reference is required for journal articles.
-  if (type.name === JOURNAL_ARTICLE_TYPE_NAME && !body.certificate_ref) {
+  // 5. Certificate reference is required where the type says so (journal articles).
+  if (type.certificate_ref_required && !body.certificate_ref) {
     return reject(400, "certificate_ref_required");
   }
 

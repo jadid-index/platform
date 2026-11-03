@@ -19,18 +19,22 @@ import type {
   ReviewQueueItem,
   RubricRow,
   SubmissionForReview,
+  TypeName,
   University,
 } from "@/lib/types";
 import {
   adminErrorFromSql,
+  rubricErrorFromSql,
   todayInTashkent,
   type AdminAuditQuery,
   type AdminUsersQuery,
   type Level,
+  type PointsCell,
   type ProfileBody,
   type ProfileStatus,
   type Result,
   type Role,
+  type TypeBody,
 } from "@/lib/validation";
 
 // The one server-side module that talks to the database and storage. Route handlers and server components
@@ -112,23 +116,27 @@ export async function createStudentProfile(userId: string, body: ProfileBody): P
 
 // ------------------------------------------------------------------ meta
 
-export async function getMeta(): Promise<Meta> {
+// The student form gets active types only (inactive ones cannot be submitted). The review screen passes
+// includeInactive, so a pending submission of a type deactivated since still shows its type.
+export async function getMeta(opts: { includeInactive?: boolean } = {}): Promise<Meta> {
   const db = getAdminClient();
+  let typesQuery = db.from("achievement_types").select("id, category_code, name, base_points, has_placement, proof_hint, active, certificate_ref_required").order("id");
+  if (!opts.includeInactive) typesQuery = typesQuery.eq("active", true);
   const [universities, types, rubric, countFrom] = await Promise.all([
     listUniversitiesWithFaculties(),
-    db
-      .from("achievement_types")
-      .select("id, category_code, name, base_points, has_placement, proof_hint")
-      .order("id"),
+    typesQuery,
     db.from("rubric_points").select("type_id, level, result, points").order("type_id").order("points"),
     getCountFrom(),
   ]);
   if (types.error) throw types.error;
   if (rubric.error) throw rubric.error;
+  const achievementTypes = (types.data ?? []) as AchievementType[];
+  const typeIds = new Set(achievementTypes.map((x) => x.id));
   return {
     universities,
-    achievement_types: (types.data ?? []) as AchievementType[],
-    rubric_points: (rubric.data ?? []) as RubricRow[],
+    achievement_types: achievementTypes,
+    // Only cells of the returned types, so the form never offers a combination of an inactive type.
+    rubric_points: ((rubric.data ?? []) as RubricRow[]).filter((r) => typeIds.has(r.type_id)),
     count_from: countFrom,
   };
 }
@@ -160,7 +168,7 @@ export async function getProfileAccess(
 export async function getAchievementType(typeId: number): Promise<AchievementType | null> {
   const { data, error } = await getAdminClient()
     .from("achievement_types")
-    .select("id, category_code, name, base_points, has_placement, proof_hint")
+    .select("id, category_code, name, base_points, has_placement, proof_hint, active, certificate_ref_required")
     .eq("id", typeId)
     .maybeSingle();
   if (error) throw error;
@@ -383,7 +391,7 @@ export async function listOwnSubmissions(studentId: string): Promise<OwnSubmissi
   if (subs.error) throw subs.error;
   if (types.error) throw types.error;
 
-  const typeNames = new Map((types.data ?? []).map((t) => [t.id as number, t.name as string]));
+  const typeNames = new Map((types.data ?? []).map((t) => [t.id as number, t.name as TypeName]));
   return (subs.data ?? []).map((s) => {
     // reviews.submission_id is unique, so PostgREST may return an object or a one-element array.
     const review = (Array.isArray(s.reviews) ? s.reviews[0] : s.reviews) as
@@ -394,7 +402,7 @@ export async function listOwnSubmissions(studentId: string): Promise<OwnSubmissi
       id: s.id,
       title: s.title,
       type_id: s.type_id,
-      type_name: typeNames.get(s.type_id) ?? "",
+      type_name: typeNames.get(s.type_id) ?? { uz: "" },
       level: s.level,
       result: s.result,
       achievement_date: s.achievement_date,
@@ -433,10 +441,10 @@ export async function withdrawOwnSubmission(submissionId: string, studentId: str
 
 // ---------------------------------------------------------------- review
 
-async function typeNames(): Promise<Map<number, string>> {
+async function typeNames(): Promise<Map<number, TypeName>> {
   const { data, error } = await getAdminClient().from("achievement_types").select("id, name");
   if (error) throw error;
-  return new Map((data ?? []).map((t) => [t.id as number, t.name as string]));
+  return new Map((data ?? []).map((t) => [t.id as number, t.name as TypeName]));
 }
 
 type StudentEmbed = { id: string; full_name: string; course: number | null; faculties: { name: string } | null };
@@ -473,7 +481,7 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
       id: s.id,
       title: s.title,
       type_id: s.type_id,
-      type_name: names.get(s.type_id) ?? "",
+      type_name: names.get(s.type_id) ?? { uz: "" },
       level: s.level,
       result: s.result,
       submitted_at: s.submitted_at,
@@ -711,7 +719,7 @@ export async function getPublicStudent(studentId: string): Promise<PublicStudent
   cacheLife(LEADERBOARD_CACHE);
 
   const db = getAdminClient();
-  const [student, works, types] = await Promise.all([
+  const [student, works] = await Promise.all([
     db
       .from("leaderboard")
       .select("student_id, full_name, photo_path, university, faculty, total_points")
@@ -719,17 +727,14 @@ export async function getPublicStudent(studentId: string): Promise<PublicStudent
       .maybeSingle(),
     db
       .from("public_works")
-      .select("title, type_name, level, result, points_awarded, achievement_date")
+      .select("title, type_id, type_name, level, result, points_awarded, achievement_date")
       .eq("student_id", studentId)
       .order("achievement_date", { ascending: false }),
-    db.from("achievement_types").select("id, name"),
   ]);
   if (student.error) throw student.error;
   if (works.error) throw works.error;
-  if (types.error) throw types.error;
   if (!student.data) return null;
 
-  const typeIds = new Map((types.data ?? []).map((x) => [x.name as string, x.id as number]));
   return {
     student_id: student.data.student_id,
     full_name: student.data.full_name,
@@ -737,10 +742,7 @@ export async function getPublicStudent(studentId: string): Promise<PublicStudent
     faculty: student.data.faculty,
     photo_url: avatarUrl(student.data.photo_path),
     total_points: student.data.total_points,
-    works: ((works.data ?? []) as Omit<PublicWork, "type_id">[]).map((w) => ({
-      ...w,
-      type_id: typeIds.get(w.type_name) ?? null,
-    })),
+    works: (works.data ?? []) as PublicWork[],
   };
 }
 
@@ -1002,4 +1004,84 @@ export async function listAuditActions(): Promise<string[]> {
   const { data, error } = await getAdminClient().rpc("admin_audit_actions");
   if (error) throw error;
   return (data ?? []) as string[];
+}
+
+// ------------------------------------------------------------ rubric admin
+
+export type AdminCategory = { code: string; name: string; yearly_cap: number };
+export type AdminType = AchievementType & { in_use: boolean };
+export type AdminRubric = { categories: AdminCategory[]; types: AdminType[]; cells: RubricRow[] };
+
+// Everything the editor shows, inactive types included. in_use: a submission or review refers to the type, so it
+// cannot be deleted or switch has_placement.
+export async function getRubricForAdmin(): Promise<AdminRubric> {
+  const db = getAdminClient();
+  const [categories, types, cells] = await Promise.all([
+    db.from("categories").select("code, name, yearly_cap").order("code"),
+    db
+      .from("achievement_types")
+      .select("id, category_code, name, base_points, has_placement, proof_hint, active, certificate_ref_required")
+      .order("id"),
+    db.from("rubric_points").select("type_id, level, result, points").order("type_id"),
+  ]);
+  for (const r of [categories, types, cells]) if (r.error) throw r.error;
+
+  // Count queries per type, not a list of rows: PostgREST returns at most 1000 rows per request.
+  const list = (types.data ?? []) as AchievementType[];
+  const inUse = await Promise.all(
+    list.map(async (x) => {
+      const [subs, reviews] = await Promise.all([
+        db.from("submissions").select("id", { count: "exact", head: true }).eq("type_id", x.id),
+        db.from("reviews").select("id", { count: "exact", head: true }).eq("final_type_id", x.id),
+      ]);
+      if (subs.error) throw subs.error;
+      if (reviews.error) throw reviews.error;
+      return (subs.count ?? 0) + (reviews.count ?? 0) > 0;
+    }),
+  );
+  return {
+    categories: (categories.data ?? []) as AdminCategory[],
+    types: list.map((x, i) => ({ ...x, in_use: inUse[i] })),
+    cells: (cells.data ?? []) as RubricRow[],
+  };
+}
+
+export type RubricOutcome<T> = { ok: true; data: T } | { ok: false; code: string; status: number; message: string };
+
+// The SQL functions check the admin, the reason and every range, and write the audit rows.
+async function rubricCall<T>(fn: string, args: Record<string, unknown>): Promise<RubricOutcome<T>> {
+  const { data, error } = await getAdminClient().rpc(fn, args);
+  if (!error) return { ok: true, data: data as T };
+  if (error.code === "P0001") return { ok: false, ...rubricErrorFromSql(error.message), message: error.message };
+  throw error;
+}
+
+export function saveAchievementType(actorId: string, id: number | null, body: TypeBody) {
+  return rubricCall<AchievementType>("admin_save_type", {
+    p_actor: actorId,
+    p_id: id,
+    p_name: body.name,
+    p_category: body.category_code,
+    p_base: body.base_points,
+    p_has_placement: body.has_placement,
+    p_proof_hint: body.proof_hint,
+    p_cert_required: body.certificate_ref_required,
+    p_reason: body.reason,
+  });
+}
+
+export function setAchievementTypeActive(actorId: string, id: number, active: boolean, reason: string) {
+  return rubricCall<AchievementType>("admin_set_type_active", { p_actor: actorId, p_id: id, p_active: active, p_reason: reason });
+}
+
+export function deleteAchievementType(actorId: string, id: number, reason: string) {
+  return rubricCall<null>("admin_delete_type", { p_actor: actorId, p_id: id, p_reason: reason });
+}
+
+export function setRubricPoints(actorId: string, cells: PointsCell[], reason: string) {
+  return rubricCall<number>("admin_set_rubric_points", { p_actor: actorId, p_cells: cells, p_reason: reason });
+}
+
+export function setCategoryCap(actorId: string, code: string, cap: number, reason: string) {
+  return rubricCall<AdminCategory>("admin_set_category_cap", { p_actor: actorId, p_code: code, p_cap: cap, p_reason: reason });
 }

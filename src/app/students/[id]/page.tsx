@@ -7,7 +7,7 @@ import { Card, CardContent, EmptyState, ErrorState, SectionHeader } from "@/comp
 import { LoadingState } from "@/components/loading-state";
 import { StudentAvatar } from "@/components/student-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { achievementTypeName, format, formatDate, t } from "@/i18n";
+import { typeName, format, formatDate, t } from "@/i18n";
 import { getPublicStudent } from "@/lib/db";
 import type { PublicStudent } from "@/lib/types";
 
@@ -82,7 +82,7 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
                       <span className="shrink-0 font-semibold text-primary-strong tabular">+{w.points_awarded}</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {w.type_id ? achievementTypeName(w.type_id, w.type_name) : w.type_name} · {t.levels[w.level]}
+                      {typeName(w.type_name)} · {t.levels[w.level]}
                       {w.result !== "confirmed" ? ` · ${t.results[w.result]}` : ""}
                     </p>
                     <p className="text-sm text-muted-foreground">{formatDate(w.achievement_date)}</p>

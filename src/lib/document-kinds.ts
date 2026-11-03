@@ -27,6 +27,11 @@ export const EXPECTED_KINDS: Record<number, readonly DocumentKind[]> = {
   10: ["certificate", "award_letter"], // Leadership
   11: ["certificate", "award_letter"], // Course
   12: ["other"], // Book challenge
+  // Draft journal types from migration 20261104000000. Types an admin adds later get no expectation (no warning).
+  13: ["journal_article"], // Journal article: Scopus / Web of Science
+  14: ["journal_article"], // Journal article: VAK (OAK) listed
+  15: ["journal_article"], // Journal article: other national
+  16: ["journal_article"], // Journal article: other international
 };
 
 export function kindFitsType(kind: string, typeId: number): boolean {

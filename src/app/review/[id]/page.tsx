@@ -10,7 +10,7 @@ import { checkReviewerPage } from "@/components/reviewer-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ds";
-import { achievementTypeName, format, formatAge, formatDate, t } from "@/i18n";
+import { typeName, format, formatAge, formatDate, t } from "@/i18n";
 import {
   createProofReadUrl,
   findLiveDuplicates,
@@ -52,7 +52,7 @@ async function ReviewLoader({ params }: { params: PageProps<"/review/[id]">["par
   let submission: SubmissionForReview | null;
   let meta: Meta;
   try {
-    [submission, meta] = await Promise.all([getSubmissionForReview(id.data), getMeta()]);
+    [submission, meta] = await Promise.all([getSubmissionForReview(id.data), getMeta({ includeInactive: true })]);
   } catch (error) {
     console.error("load review failed", error);
     return <ErrorState message={t.review.loadError} />;
@@ -109,7 +109,7 @@ async function ReviewLoader({ params }: { params: PageProps<"/review/[id]">["par
       <div className="grid gap-4">
         <SubmittedData
           submission={submission}
-          typeName={meta.achievement_types.find((x) => x.id === submission.type_id)?.name ?? ""}
+          typeLabel={typeName(meta.achievement_types.find((x) => x.id === submission.type_id)?.name)}
         />
         <RecognitionCard extraction={submission.ai_extraction} checks={checks} duplicates={duplicates} />
         {isOwn ? (
@@ -119,7 +119,8 @@ async function ReviewLoader({ params }: { params: PageProps<"/review/[id]">["par
         ) : null}
         <ReviewPanel
           submissionId={submission.id}
-          types={meta.achievement_types}
+          // The reviewer may correct to an active type, or keep the submitted one even if it was deactivated since.
+          types={meta.achievement_types.filter((x) => x.active || x.id === submission.type_id)}
           rubric={meta.rubric_points}
           initial={{ typeId: String(submission.type_id), level: submission.level, result: submission.result }}
           initialPreview={preview}
@@ -173,7 +174,7 @@ function ProofViewer({ url, path }: { url: string; path: string }) {
   );
 }
 
-function SubmittedData({ submission: s, typeName }: { submission: SubmissionForReview; typeName: string }) {
+function SubmittedData({ submission: s, typeLabel }: { submission: SubmissionForReview; typeLabel: string }) {
   const ref = s.certificate_ref;
   const rows: [string, React.ReactNode][] = [
     [
@@ -182,7 +183,7 @@ function SubmittedData({ submission: s, typeName }: { submission: SubmissionForR
         .filter(Boolean)
         .join(" · "),
     ],
-    [t.review.type, achievementTypeName(s.type_id, typeName)],
+    [t.review.type, typeLabel],
     [t.review.level, t.levels[s.level]],
     ...(s.result !== "confirmed" ? [[t.review.result, t.results[s.result]] as [string, React.ReactNode]] : []),
     [t.review.titleField, s.title],

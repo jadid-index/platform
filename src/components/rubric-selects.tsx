@@ -2,7 +2,7 @@
 
 import { Field } from "@/components/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { achievementTypeName, t } from "@/i18n";
+import { typeName, t } from "@/i18n";
 import type { AchievementType, RubricRow } from "@/lib/types";
 import { LEVELS, RESULTS, type Level, type Result } from "@/lib/validation";
 
@@ -81,7 +81,7 @@ export function RubricSelects({
           <SelectContent>
             {types.map((x) => (
               <SelectItem key={x.id} value={String(x.id)}>
-                {achievementTypeName(x.id, x.name)}
+                {typeName(x.name)}
               </SelectItem>
             ))}
           </SelectContent>

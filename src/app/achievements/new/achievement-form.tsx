@@ -15,7 +15,6 @@ import { format, formatDate, t } from "@/i18n";
 import { kindFitsType } from "@/lib/document-kinds";
 import type { Meta, RejectedSubmission } from "@/lib/types";
 import {
-  JOURNAL_ARTICLE_TYPE_NAME,
   NOTE_MAX_LENGTH,
   PROOF_CONTENT_TYPES,
   PROOF_MAX_BYTES,
@@ -58,6 +57,7 @@ const API_ERRORS: Record<string, string> = {
   file_missing: t.errors.fileMissing,
   duplicate_file: t.errors.duplicateFile,
   invalid_type: t.errors.invalidCombination,
+  type_inactive: t.errors.typeInactive,
   invalid_combination: t.errors.invalidCombination,
   date_in_future: t.errors.dateInFuture,
   certificate_ref_required: t.errors.certificateRefRequired,
@@ -74,12 +74,12 @@ const COMMENT_MAX_LENGTH = 500;
 // A resubmission starts from the rejected submission's fields; the student checks and confirms each one.
 function initialValues(meta: Meta, parent: RejectedSubmission | null): Values {
   if (!parent) return EMPTY;
+  // An inactive type is not offered any more: keep the text fields and let the student pick a current type.
   const type = meta.achievement_types.find((x) => x.id === parent.type_id);
-  if (!type) return EMPTY;
   return {
-    typeId: String(parent.type_id),
-    level: parent.level,
-    result: type.has_placement ? parent.result : "",
+    typeId: type ? String(parent.type_id) : "",
+    level: type ? parent.level : "",
+    result: type?.has_placement ? parent.result : "",
     title: parent.title,
     issuer: parent.issuer,
     date: parent.achievement_date,
@@ -154,7 +154,7 @@ export function AchievementForm({ meta, parent = null }: { meta: Meta; parent?: 
   const busy = phase === "uploading" || phase === "submitting";
   const rubricValue: RubricValue = { typeId: values.typeId, level: values.level, result: values.result };
   const { type, row: preview } = resolveRubric(meta.achievement_types, meta.rubric_points, rubricValue);
-  const certificateRequired = type?.name === JOURNAL_ARTICLE_TYPE_NAME;
+  const certificateRequired = type?.certificate_ref_required ?? false;
   // Field labels follow the chosen type (for example "Jurnal nomi" instead of "Tashkilot" for an article).
   const labels = {
     title: t.achievement.titleLabel,

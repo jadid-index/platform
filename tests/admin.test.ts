@@ -84,7 +84,19 @@ function call(h: { method: string; handler: Handler; params: Record<string, stri
 describe("admin route access", () => {
   it("finds the admin routes", async () => {
     const names = (await adminHandlers()).map((h) => h.name).sort();
-    expect(names).toEqual(expect.arrayContaining(["GET audit/route.ts", "GET users/route.ts", "PATCH users/[id]/route.ts"]));
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "GET audit/route.ts",
+        "GET users/route.ts",
+        "PATCH users/[id]/route.ts",
+        "GET rubric/route.ts",
+        "POST rubric/types/route.ts",
+        "PATCH rubric/types/[id]/route.ts",
+        "DELETE rubric/types/[id]/route.ts",
+        "PUT rubric/points/route.ts",
+        "PATCH rubric/categories/[code]/route.ts",
+      ]),
+    );
   });
 
   it("refuses every admin route without a session (401) and for student, reviewer and employer (403)", async () => {

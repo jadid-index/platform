@@ -2,13 +2,18 @@
 export type Faculty = { id: number; name: string };
 export type University = { id: number; name: string; faculties: Faculty[] };
 
+// Type names are stored per language in achievement_types.name; "uz" is always set.
+export type TypeName = { uz: string; en?: string; ru?: string };
+
 export type AchievementType = {
   id: number;
   category_code: string;
-  name: string;
+  name: TypeName;
   base_points: number;
   has_placement: boolean;
   proof_hint: string | null;
+  active: boolean; // inactive types are hidden from the student form and cannot be submitted
+  certificate_ref_required: boolean;
 };
 
 export type RubricRow = {
@@ -32,7 +37,7 @@ export type OwnSubmission = {
   id: string;
   title: string;
   type_id: number;
-  type_name: string;
+  type_name: TypeName;
   level: RubricRow["level"];
   result: RubricRow["result"];
   achievement_date: string;
@@ -59,7 +64,7 @@ export type ReviewQueueItem = {
   id: string;
   title: string;
   type_id: number;
-  type_name: string;
+  type_name: TypeName;
   level: RubricRow["level"];
   result: RubricRow["result"];
   submitted_at: string;
@@ -130,8 +135,8 @@ export type Leaderboard = {
 
 export type PublicWork = {
   title: string;
-  type_id: number | null;
-  type_name: string;
+  type_id: number;
+  type_name: TypeName;
   level: RubricRow["level"];
   result: RubricRow["result"];
   points_awarded: number;

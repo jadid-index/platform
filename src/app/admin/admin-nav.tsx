@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 const SECTIONS = [
   { href: "/admin/users", label: t.admin.usersTitle },
+  { href: "/admin/rubric", label: t.admin.rubric.title },
   { href: "/admin/audit", label: t.admin.auditTitle },
 ] as const;
 

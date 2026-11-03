@@ -6,7 +6,7 @@ import { Suspense } from "react";
 import { Card, CardContent, Chip, EmptyState, ErrorState, ListSkeleton, SectionHeader } from "@/components/ds";
 import { checkReviewerPage } from "@/components/reviewer-gate";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { achievementTypeName, format, formatAge, formatDate, t } from "@/i18n";
+import { typeName, format, formatAge, formatDate, t } from "@/i18n";
 import { listReviewQueue } from "@/lib/db";
 import type { ReviewQueueItem } from "@/lib/types";
 
@@ -130,7 +130,7 @@ async function Queue() {
 }
 
 function typeLine(s: ReviewQueueItem): string {
-  return `${achievementTypeName(s.type_id, s.type_name)} · ${t.levels[s.level]}${
+  return `${typeName(s.type_name)} · ${t.levels[s.level]}${
     s.result !== "confirmed" ? ` · ${t.results[s.result]}` : ""
   }`;
 }

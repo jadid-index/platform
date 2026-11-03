@@ -5,7 +5,9 @@ Pilot: International Islamic Academy of Uzbekistan (IIAU). First demo: Thursday.
 
 Read `docs/SPEC.md` before building anything. It has the endpoints, validation, the AI extraction prompt
 and the build order. `docs/schema.sql` and `docs/seed.sql` are the source of truth for the database.
-The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated from it, never edit points by hand.
+The rubric started in the v0.3 workbook (in the repo as `docs/rubric.xlsx`); `seed.sql` was generated from it and both
+stay as the original seed. **After the first edit on `/admin/rubric`, the database is the source of truth for the rubric**;
+do not regenerate or re-run the seed against a live database, and never edit points by hand in SQL.
 
 ## Stack and deployment
 
@@ -19,6 +21,10 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
 
 1. **Points come only from the `rubric_points` table.** Approval goes through the `approve_submission()` SQL function,
    which applies the yearly category cap. Never compute or store points anywhere else.
+   Admins change types, points and caps only on `/admin/rubric`, through the `admin_*` rubric SQL functions
+   (range checks, a required reason, one `audit_log` row per change). Approved reviews keep the points they were given
+   (`reviews.rubric_points` / `points_awarded` are snapshots); a rubric change applies to future approvals only.
+   Never change an existing review row from a rubric edit. Correcting approved reviews is a separate, later feature.
 2. **AI never decides anything.** It extracts fields and suggests values. The student confirms the form, and a human
    reviewer approves or rejects. AI output is saved in `ai_extraction` / `ai_flags` for the reviewer to see.
 3. **The browser never writes to the database.** All writes go through server route handlers using the Supabase secret key (`sb_secret_...`).

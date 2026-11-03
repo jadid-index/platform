@@ -12,7 +12,7 @@ import { CONSENT_VERSION } from "@/lib/consent";
 import { createStudentProfile, getMeta, listUniversitiesWithFaculties } from "@/lib/db";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createSubmissionFromUpload, issueProofUpload } from "@/lib/submissions";
-import type { Meta } from "@/lib/types";
+import type { Meta, TypeName } from "@/lib/types";
 import type { Level, ProfileStatus, Result, Role, SubmissionBody } from "@/lib/validation";
 
 export const TEST_EMAIL_DOMAIN = "example.invalid";
@@ -212,14 +212,30 @@ export async function insertAuditRows(actorId: string, action: string, count: nu
 
 // ---------------------------------------------------------------- rubric
 
-export type RubricChoice = { type_id: number; type_name: string; category_code: string; level: Level; result: Result; points: number };
+export type RubricChoice = {
+  type_id: number;
+  type_name: TypeName;
+  certificate_ref_required: boolean;
+  category_code: string;
+  level: Level;
+  result: Result;
+  points: number;
+};
 
 export async function rubricChoices(): Promise<{ meta: Meta; rows: RubricChoice[] }> {
   const meta = await getMeta();
   const types = new Map(meta.achievement_types.map((t) => [t.id, t]));
   const rows = meta.rubric_points.map((r) => {
     const type = types.get(r.type_id)!;
-    return { type_id: r.type_id, type_name: type.name, category_code: type.category_code, level: r.level, result: r.result, points: r.points };
+    return {
+      type_id: r.type_id,
+      type_name: type.name,
+      certificate_ref_required: type.certificate_ref_required,
+      category_code: type.category_code,
+      level: r.level,
+      result: r.result,
+      points: r.points,
+    };
   });
   return { meta, rows };
 }
@@ -229,6 +245,12 @@ export async function rubricChoices(): Promise<{ meta: Meta; rows: RubricChoice[
 // Removes every test user (or only those whose email starts with test-<prefix>), their files and rows.
 // Order matters: reviews and audit_log reference profiles without ON DELETE CASCADE.
 export async function cleanTestData(prefix?: string): Promise<number> {
+  const removed = await removeTestUsers(prefix);
+  await removeTestRubric(prefix);
+  return removed;
+}
+
+async function removeTestUsers(prefix?: string): Promise<number> {
   const db = getAdminClient();
   const users: { id: string; email: string }[] = [];
   for (let page = 1; ; page++) {
@@ -284,4 +306,35 @@ export async function cleanTestData(prefix?: string): Promise<number> {
     if (error) throw error;
   }
   return users.length;
+}
+
+// Test rubric data: types named "[TEST] <prefix> ..." and categories "test_<prefix>...". Runs after the users,
+// whose submissions and reviews (which reference the cells) are gone by then.
+export const testTypeName = (prefix: string, label: string) => `[TEST] ${prefix} ${label}`;
+export const testCategoryCode = (prefix: string) => `test_${prefix}`.toLowerCase();
+
+async function removeTestRubric(prefix?: string): Promise<void> {
+  const db = getAdminClient();
+  const { data: types, error } = await db
+    .from("achievement_types")
+    .select("id")
+    .like("name->>uz", prefix ? `[TEST] ${prefix}%` : "[TEST]%");
+  if (error) throw error;
+  const typeIds = (types ?? []).map((x) => x.id as number);
+  if (typeIds.length) {
+    const steps = [
+      db.from("audit_log").delete().eq("entity", "achievement_type").in("entity_id", typeIds.map(String)),
+      db.from("rubric_points").delete().in("type_id", typeIds),
+      db.from("achievement_types").delete().in("id", typeIds),
+    ];
+    for (const step of steps) {
+      const { error: stepError } = await step;
+      if (stepError) throw stepError;
+    }
+  }
+  const { error: catError } = await db
+    .from("categories")
+    .delete()
+    .like("code", prefix ? `${testCategoryCode(prefix)}%` : "test\\_%");
+  if (catError) throw catError;
 }

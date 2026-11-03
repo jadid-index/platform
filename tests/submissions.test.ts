@@ -38,7 +38,7 @@ const valid = (over: Partial<Parameters<typeof fields>[0]> = {}) =>
 beforeAll(async () => {
   [alice, bob] = await Promise.all([createTestStudent(local("alice"), "Alice"), createTestStudent(local("bob"), "Bob")]);
   const { rows } = await rubricChoices();
-  simple = rows.find((r) => r.type_name !== "Journal article")!;
+  simple = rows.find((r) => !r.certificate_ref_required)!;
 });
 
 describe("POST /api/submissions path (issueProofUpload + createSubmissionFromUpload)", () => {

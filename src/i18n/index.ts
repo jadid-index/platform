@@ -1,4 +1,5 @@
 import { uz, type Messages } from "@/i18n/uz";
+import type { TypeName } from "@/lib/types";
 
 // Only Uzbek (Latin) for now. Add ru.ts / en.ts with the same shape and pick by locale here.
 export const locale = "uz";
@@ -11,8 +12,10 @@ export function format(template: string, values: Record<string, string | number>
   );
 }
 
-export function achievementTypeName(id: number, fallback: string): string {
-  return t.achievementTypes[id] ?? fallback;
+// Type names come from the database ({ uz, en, ru }); show the current language, else Uzbek.
+export function typeName(name: TypeName | null | undefined): string {
+  if (!name) return "";
+  return name[locale as keyof TypeName] ?? name.uz;
 }
 
 // "2026-09-15" or an ISO timestamp -> "15.09.2026" (dates are shown in Uzbekistan time).

@@ -21,7 +21,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { academicYearLabel, achievementTypeName, format, formatDate, t } from "@/i18n";
+import { academicYearLabel, typeName, format, formatDate, t } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getCategoryProgress,
@@ -261,7 +261,7 @@ async function SubmissionList({ studentId, canResubmit }: { studentId: string; c
               </div>
               <p className="font-medium break-words">{s.title}</p>
               <p className="text-small text-muted-foreground">
-                {achievementTypeName(s.type_id, s.type_name)} · {t.levels[s.level]}
+                {typeName(s.type_name)} · {t.levels[s.level]}
                 {s.result !== "confirmed" ? ` · ${t.results[s.result]}` : ""}
               </p>
               <p className="text-small text-muted-foreground tabular">

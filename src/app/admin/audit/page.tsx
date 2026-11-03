@@ -4,8 +4,9 @@ import { Suspense } from "react";
 import { checkAdminPage } from "@/components/admin-gate";
 import { Card, CardContent, EmptyState, ErrorState, ListSkeleton, SectionHeader } from "@/components/ds";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDateTime, t } from "@/i18n";
+import { formatDateTime, t, typeName } from "@/i18n";
 import { listAuditActions, listAuditLog, type AuditEntry } from "@/lib/db";
+import type { TypeName } from "@/lib/types";
 import { adminAuditQuerySchema, type AdminAuditQuery } from "@/lib/validation";
 
 import { Pager } from "../pager";
@@ -46,21 +47,41 @@ function actorLabel(e: AuditEntry): string {
 }
 
 function targetLabel(e: AuditEntry): string {
-  return e.target_name ? `${e.target_name}` : `${e.entity} ${e.entity_id.slice(0, 8)}`;
+  if (e.target_name) return e.target_name;
+  // UUIDs are shortened; rubric keys (type id, "3:national:winner", category code) are shown in full.
+  const uuid = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(e.entity_id);
+  return `${e.entity} ${uuid ? e.entity_id.slice(0, 8) : e.entity_id}`;
 }
 
-// "old → new" for role and status changes (translated), otherwise the details as short key: value pairs.
+const show = (v: unknown): string =>
+  v === null || v === undefined ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v);
+
+// "old → new". Role and status values are translated; for whole rows (rubric types) only the fields that changed
+// are listed. The reason, when there is one, is shown on its own line.
 function changeLabel(e: AuditEntry): string {
   const d = e.details ?? {};
   if ("old" in d && "new" in d) {
     const dict = e.action === "profile.role_changed" ? t.admin.roles : e.action === "profile.status_changed" ? t.admin.statuses : {};
-    const show = (v: unknown) => dict[String(v)] ?? String(v);
-    return `${show(d.old)} → ${show(d.new)}`;
+    const isRow = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+    if (isRow(d.old) && isRow(d.new)) {
+      const before = d.old;
+      const after = d.new;
+      const fields = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
+        (k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]),
+      );
+      return fields.map((k) => `${k}: ${show(before[k])} → ${show(after[k])}`).join("; ");
+    }
+    if (isRow(d.new) && d.old === null) return typeName(d.new.name as TypeName) || show(d.new);
+    if (isRow(d.old) && d.new === null) return typeName(d.old.name as TypeName) || show(d.old);
+    return `${dict[String(d.old)] ?? show(d.old)} → ${dict[String(d.new)] ?? show(d.new)}`;
   }
   return Object.entries(d)
-    .map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+    .filter(([k]) => k !== "reason")
+    .map(([k, v]) => `${k}: ${show(v)}`)
     .join(", ");
 }
+
+const reasonOf = (e: AuditEntry) => (typeof e.details?.reason === "string" ? e.details.reason : null);
 
 async function Audit({ searchParams }: { searchParams: PageProps<"/admin/audit">["searchParams"] }) {
   await checkAdminPage();
@@ -114,7 +135,14 @@ async function Audit({ searchParams }: { searchParams: PageProps<"/admin/audit">
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{actionLabel(e.action)}</TableCell>
                     <TableCell className="whitespace-normal">{targetLabel(e)}</TableCell>
-                    <TableCell className="max-w-sm pr-4 whitespace-normal break-words">{changeLabel(e)}</TableCell>
+                    <TableCell className="max-w-sm pr-4 whitespace-normal break-words">
+                      <div>{changeLabel(e)}</div>
+                      {reasonOf(e) ? (
+                        <div className="text-small text-muted-foreground">
+                          {t.admin.reasonLabel}: {reasonOf(e)}
+                        </div>
+                      ) : null}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -137,6 +165,11 @@ async function Audit({ searchParams }: { searchParams: PageProps<"/admin/audit">
                       {t.admin.colTarget}: {targetLabel(e)}
                     </span>
                     <span className="text-small break-words text-muted-foreground">{changeLabel(e)}</span>
+                    {reasonOf(e) ? (
+                      <span className="text-small break-words text-muted-foreground">
+                        {t.admin.reasonLabel}: {reasonOf(e)}
+                      </span>
+                    ) : null}
                   </CardContent>
                 </Card>
               </li>

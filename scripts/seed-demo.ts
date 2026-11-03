@@ -76,7 +76,7 @@ async function seed() {
 
   for (const [n, [s, pick, date, outcome]] of PLAN.entries()) {
     const choice = picks[pick % picks.length];
-    const title = `[TEST] ${choice.type_name} ${n + 1}`;
+    const title = `[TEST] ${choice.type_name.uz} ${n + 1}`;
     const { issued, created } = await submitThroughApiPath(
       students[s].id,
       fields({

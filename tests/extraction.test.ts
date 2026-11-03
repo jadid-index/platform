@@ -84,7 +84,7 @@ afterEach(() => {
 
 beforeAll(async () => {
   [alice, bob] = await Promise.all([createTestStudent(local("alice"), "Alice"), createTestStudent(local("bob"), "Bob")]);
-  simple = (await rubricChoices()).rows.find((r) => r.type_name !== "Journal article")!;
+  simple = (await rubricChoices()).rows.find((r) => !r.certificate_ref_required)!;
 });
 
 describe("POST /api/extract (extractForStudent)", () => {

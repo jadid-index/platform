@@ -3,6 +3,7 @@ import {
   ClipboardCheck,
   House,
   PlusCircle,
+  Scale,
   ScrollText,
   Trophy,
   UserRoundCheck,
@@ -22,6 +23,7 @@ const ICONS = {
   onboarding: UserRoundCheck,
   users: UsersRound,
   audit: ScrollText,
+  rubric: Scale,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIcon = keyof typeof ICONS;
