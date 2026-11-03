@@ -72,7 +72,7 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/da
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
-      <aside className="grid gap-4 lg:sticky lg:top-24" aria-label={t.dashboard.categoriesTitle}>
+      <aside className="grid gap-4 lg:sticky lg:top-(--nav-offset)" aria-label={t.dashboard.categoriesTitle}>
         <Card className="gap-4 py-5">
           <CardHeader className="px-5">
             <CardTitle className="text-h2">{format(t.dashboard.greeting, { name: profile.full_name })}</CardTitle>

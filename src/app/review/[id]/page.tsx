@@ -95,7 +95,7 @@ async function ReviewLoader({ params }: { params: PageProps<"/review/[id]">["par
   // Phones: stacked, file first.
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-6">
-      <section className="lg:sticky lg:top-24" aria-labelledby="proof-title">
+      <section className="lg:sticky lg:top-(--nav-offset)" aria-labelledby="proof-title">
         <Card className="gap-3 py-4">
           <CardHeader className="px-4">
             <CardTitle id="proof-title">{t.review.file}</CardTitle>

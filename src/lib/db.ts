@@ -900,6 +900,14 @@ export async function getPublicCounts(): Promise<PublicCounts> {
   };
 }
 
+// The tier ladder for public display (code, label, order; no thresholds). Tier edits purge LEADERBOARD_TAG.
+export async function getPublicTiersCached(): Promise<PublicTier[]> {
+  "use cache: remote";
+  cacheTag(LEADERBOARD_TAG);
+  cacheLife(LEADERBOARD_CACHE);
+  return (await listTiers()).map(({ code, label, sort_order }) => ({ code, label, sort_order }));
+}
+
 // Reference data for the public filters; changes rarely.
 export async function getUniversitiesCached(): Promise<University[]> {
   "use cache";

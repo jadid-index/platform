@@ -10,8 +10,9 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-// Sidebar link that highlights itself on the current page. Render it inside <Suspense>: the URL is runtime data.
-export function NavItem(props: NavLinkProps) {
+// Nav link that marks itself on the current page. Render it inside <Suspense>: the URL is runtime data.
+// match: the path prefix that counts as active (default: href), e.g. "/admin" for every admin section.
+export function NavItem({ match, ...props }: NavLinkProps & { match?: string }) {
   const pathname = usePathname();
-  return <NavLinkView {...props} active={isActive(pathname, props.href)} />;
+  return <NavLinkView {...props} active={isActive(pathname, match ?? props.href)} />;
 }

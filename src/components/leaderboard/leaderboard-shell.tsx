@@ -104,7 +104,7 @@ export function LeaderboardShell({
       </Tabs>
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <Card className="gap-4 py-4 lg:sticky lg:top-24 lg:order-2" role="search" aria-label={t.leaderboard.filtersTitle}>
+        <Card className="gap-4 py-4 lg:sticky lg:top-(--nav-offset) lg:order-2" role="search" aria-label={t.leaderboard.filtersTitle}>
           <CardHeader className="px-4 max-lg:sr-only">
             <CardTitle className="text-body">{t.leaderboard.filtersTitle}</CardTitle>
           </CardHeader>

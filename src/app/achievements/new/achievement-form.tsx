@@ -583,7 +583,7 @@ export function AchievementForm({ meta, parent = null }: { meta: Meta; parent?: 
         </CardContent>
       </Card>
 
-      <aside className="hidden gap-4 lg:sticky lg:top-24 lg:grid">
+      <aside className="hidden gap-4 lg:sticky lg:top-(--nav-offset) lg:grid">
         <SidePanel title={t.achievement.previewTitle}>
           <FilePreview file={errors.file ? null : file} />
         </SidePanel>

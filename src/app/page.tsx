@@ -21,8 +21,8 @@ import { StudentAvatar } from "@/components/student-avatar";
 import { getShellViewer } from "@/components/shell/access";
 import { Button } from "@/components/ui/button";
 import { academicYearLabel, format, t, typeName } from "@/i18n";
-import { getPublicCounts, getTopTierStudents, type PublicCounts } from "@/lib/db";
-import type { TopTier } from "@/lib/types";
+import { getPublicCounts, getPublicTiersCached, getTopTierStudents, type PublicCounts } from "@/lib/db";
+import type { PublicTier, TopTier } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const CONTACT_EMAIL = "fazlddn4@gmail.com";
@@ -41,44 +41,45 @@ const STEP_ICONS: LucideIcon[] = [Upload, BadgeCheck, Trophy];
 export default function HomePage() {
   return (
     <div className="grid gap-12 lg:gap-16">
-      {/* Phones: hero, top students, counters in one column. Desktop: hero and top students side by side
-          at equal height, the counter strip below across both. */}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      {/* Hero across the full width; the counters right under it; then the four categories next to the top students. */}
+      <div className="grid gap-4 sm:gap-6">
         <Hero />
-        <section aria-labelledby="top-title">
-          <Suspense fallback={<TopStudentsSkeleton />}>
-            <TopStudents />
-          </Suspense>
-        </section>
-        <section aria-label={t.home.countersLabel} className="lg:col-span-2">
+        <section aria-label={t.home.countersLabel}>
           <Suspense fallback={<CountersSkeleton />}>
             <Counters />
           </Suspense>
         </section>
       </div>
 
-      <section aria-labelledby="categories-title" className="grid gap-4">
-        <SectionHeader id="categories-title" title={t.home.categoriesTitle} />
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {CATEGORY_ORDER.map((code) => {
-            const Icon = CATEGORY_ICONS[code];
-            const { fill, ink } = CATEGORY_STYLES[code];
-            return (
-            <li key={code} className={cn("flex gap-4 rounded-xl p-4 sm:grid sm:content-start sm:gap-3 sm:p-5", fill)}>
-              <span
-                className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg bg-surface-raised/70", ink)}
-              >
-                <Icon className="size-5" aria-hidden />
-              </span>
-              <div className="grid content-start gap-1">
-                <h3 className={cn("text-body font-semibold", ink)}>{t.categories[code]}</h3>
-                <p className={cn("text-small", ink)}>{t.home.categoryText[code]}</p>
-              </div>
-            </li>
-            );
-          })}
-        </ul>
-      </section>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-6">
+        <section aria-labelledby="categories-title" className="grid gap-4">
+          <SectionHeader id="categories-title" title={t.home.categoriesTitle} />
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {CATEGORY_ORDER.map((code) => {
+              const Icon = CATEGORY_ICONS[code];
+              const { fill, ink } = CATEGORY_STYLES[code];
+              return (
+                <li key={code} className={cn("flex gap-4 rounded-2xl p-4 sm:grid sm:content-start sm:gap-3 sm:p-5", fill)}>
+                  <span
+                    className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-raised shadow-card", ink)}
+                  >
+                    <Icon className="size-5" aria-hidden />
+                  </span>
+                  <div className="grid content-start gap-1">
+                    <h3 className={cn("text-body font-bold", ink)}>{t.categories[code]}</h3>
+                    <p className={cn("text-small", ink)}>{t.home.categoryText[code]}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+        <section aria-labelledby="top-title">
+          <Suspense fallback={<TopStudentsSkeleton />}>
+            <TopStudents />
+          </Suspense>
+        </section>
+      </div>
 
       <section aria-labelledby="how-title" className="grid gap-4">
         <SectionHeader id="how-title" title={t.home.howTitle} />
@@ -109,7 +110,7 @@ export default function HomePage() {
 
       <section
         aria-labelledby="cta-title"
-        className="grid justify-items-start gap-4 rounded-2xl border border-primary bg-primary-soft p-6 sm:p-8 lg:grid-cols-[1fr_auto] lg:items-center"
+        className="grid justify-items-start gap-4 rounded-3xl bg-primary p-6 text-primary-contrast shadow-card sm:p-10 lg:grid-cols-[1fr_auto] lg:items-center"
       >
         <Suspense fallback={<ClosingCta viewer="guest" />}>
           <ClosingCtaForViewer />
@@ -132,31 +133,96 @@ export default function HomePage() {
   );
 }
 
+// Dark (inverse) panel with the headline and one visual: the real tier ladder, best first.
 function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className="grid content-center gap-4 rounded-2xl bg-primary-soft p-5 sm:gap-5 sm:p-8 lg:p-10"
+      className="relative isolate grid items-center gap-8 overflow-hidden rounded-3xl bg-surface-inverse p-6 text-surface-inverse-foreground shadow-raised sm:p-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-12 lg:p-14"
     >
-      <h1 id="hero-title" className="text-display text-balance">
-        {t.home.heroTitle}
-      </h1>
-      <p className="max-w-xl text-muted-foreground">{t.home.heroText}</p>
-      <div className="flex flex-wrap gap-3">
-        <Suspense fallback={<PrimaryAction href="/signup" label={t.home.signup} />}>
-          <HeroPrimaryAction />
-        </Suspense>
-        <Button asChild variant="outline" size="lg">
-          <Link href="/leaderboard">{t.home.toLeaderboard}</Link>
-        </Button>
+      {/* Soft glow in the theme's primary and accent colors. Decoration only. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-24 -right-16 size-80 rounded-full bg-primary/30 blur-3xl" />
+        <div className="absolute -bottom-32 left-1/3 size-96 rounded-full bg-accent/25 blur-3xl" />
       </div>
+
+      <div className="grid content-center gap-5 sm:gap-6">
+        <p className="w-fit rounded-full border border-surface-inverse-muted/40 px-3 py-1 text-small font-semibold text-surface-inverse-muted">
+          {t.home.heroBadge}
+        </p>
+        <h1 id="hero-title" className="text-display text-balance">
+          {t.home.heroTitleLead} <span className="text-inverse-accent">{t.home.heroTitleAccent}</span>
+        </h1>
+        <p className="max-w-xl text-surface-inverse-muted">{t.home.heroText}</p>
+        <div className="flex flex-wrap gap-3">
+          <Suspense fallback={<PrimaryAction href="/signup" label={t.home.signup} />}>
+            <HeroPrimaryAction />
+          </Suspense>
+          <Button asChild variant="outline" size="lg" className="rounded-full">
+            <Link href="/leaderboard">
+              <Trophy aria-hidden />
+              {t.home.toLeaderboard}
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      <Suspense fallback={<TierLadderSkeleton />}>
+        <TierLadder />
+      </Suspense>
     </section>
   );
 }
 
-function PrimaryAction({ href, label }: { href: string; label: string }) {
+// The tier ladder from the tiers table (codes and names only, no thresholds): each step a little shorter.
+async function TierLadder() {
+  let tiers: PublicTier[];
+  try {
+    tiers = await getPublicTiersCached();
+  } catch (error) {
+    console.error("load tiers failed", error);
+    return null;
+  }
+  if (tiers.length === 0) return null;
   return (
-    <Button asChild size="lg">
+    <ol aria-label={t.home.heroLadderLabel} className="grid gap-2">
+      {tiers.map((tier, i) => (
+        <li
+          key={tier.code}
+          style={{ width: `${100 - (i * 40) / Math.max(tiers.length - 1, 1)}%` }}
+          className={cn(
+            "flex items-center gap-3 rounded-2xl border border-surface-inverse-muted/20 bg-surface-inverse-foreground/5 p-2 pr-4 backdrop-blur-sm",
+            // Phones: the four best steps are enough for the picture.
+            i >= 4 && "max-sm:hidden",
+          )}
+        >
+          <TierBadge tier={tier} size="sm" className="h-9 min-w-12 text-body ring-surface-inverse-muted/40" />
+          <span className="truncate text-small font-semibold text-surface-inverse-foreground">
+            {format(t.leaderboard.tierSection, { tier: typeName(tier.label) })}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function TierLadderSkeleton() {
+  return (
+    <div role="status" aria-label={t.common.loading} className="grid gap-2">
+      {Array.from({ length: 5 }, (_, i) => (
+        <div
+          key={i}
+          style={{ width: `${100 - i * 10}%` }}
+          className="h-13 rounded-2xl bg-surface-inverse-foreground/10"
+        />
+      ))}
+    </div>
+  );
+}
+
+function PrimaryAction({ href, label, inverse = false }: { href: string; label: string; inverse?: boolean }) {
+  return (
+    <Button asChild size="lg" variant={inverse ? "inverse" : "default"} className="rounded-full">
       <Link href={href}>
         {label}
         <ArrowRight aria-hidden />
@@ -238,7 +304,7 @@ async function TopStudents() {
   return (
     <TopCard
       description={format(t.home.topTier, { tier: typeName(top.tier.label), period })}
-      badge={<TierBadge tier={top.tier} />}
+      badge={<TierBadge tier={top.tier} className="h-[44px]" />}
     >
       <ul className="grid gap-1">
         {top.rows.map((row) => (
@@ -334,14 +400,14 @@ function ClosingCta({ viewer }: { viewer: "guest" | "student" | "other" }) {
         <h2 id="cta-title" className="text-h2">
           {t.home.ctaTitle}
         </h2>
-        <p className="text-muted-foreground">{viewer === "guest" ? t.home.ctaText : t.home.ctaTextMember}</p>
+        <p>{viewer === "guest" ? t.home.ctaText : t.home.ctaTextMember}</p>
       </div>
       {viewer === "guest" ? (
-        <PrimaryAction href="/signup" label={t.home.signup} />
+        <PrimaryAction inverse href="/signup" label={t.home.signup} />
       ) : viewer === "student" ? (
-        <PrimaryAction href="/achievements/new" label={t.home.addAchievement} />
+        <PrimaryAction inverse href="/achievements/new" label={t.home.addAchievement} />
       ) : (
-        <PrimaryAction href="/dashboard" label={t.home.toDashboard} />
+        <PrimaryAction inverse href="/dashboard" label={t.home.toDashboard} />
       )}
     </>
   );

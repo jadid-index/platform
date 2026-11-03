@@ -3,20 +3,19 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { t } from "@/i18n";
 
-import { AccountMenu } from "./account-menu";
+import { AccountActions, AccountMenu } from "./account-menu";
 import { getShellViewer } from "./access";
 
-// Top-bar right side: sign-in buttons for visitors, the profile menu for signed-in users.
+// Pill right side (lg and up): sign-in buttons for visitors, the profile menu for signed-in users.
 export async function AccountArea() {
   const viewer = await getShellViewer();
   if (viewer.kind === "guest") {
     return (
-      <div className="flex items-center gap-2">
-        <Button asChild variant="outline">
+      <div className="flex items-center gap-1.5">
+        <Button asChild variant="ghost" className="rounded-full">
           <Link href="/login">{t.home.login}</Link>
         </Button>
-        {/* On phones the sign-up button lives in the menu drawer, so the bar fits at 375 px. */}
-        <Button asChild className="hidden sm:inline-flex">
+        <Button asChild className="rounded-full">
           <Link href="/signup">{t.home.signup}</Link>
         </Button>
       </div>
@@ -25,12 +24,12 @@ export async function AccountArea() {
   return <AccountMenu name={viewer.kind === "member" ? viewer.name : null} />;
 }
 
-// Sign-up and sign-in at the bottom of the mobile drawer, for visitors only.
-export async function DrawerAuthLinks() {
+// The account part of the mobile menu sheet: sign-up and sign-in, or the profile actions.
+export async function SheetAccount() {
   const viewer = await getShellViewer();
-  if (viewer.kind !== "guest") return null;
+  if (viewer.kind !== "guest") return <AccountActions name={viewer.kind === "member" ? viewer.name : null} />;
   return (
-    <div className="grid gap-2">
+    <div className="grid grid-cols-2 gap-2">
       <Button asChild size="lg">
         <Link href="/signup">{t.home.signup}</Link>
       </Button>

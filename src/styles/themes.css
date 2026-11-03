@@ -1,0 +1,188 @@
+/*
+ * Jadid Index themes. This is the ONLY file with color values. Components use token classes
+ * (bg-primary, text-primary-text, bg-tier-1, ...) mapped in src/app/globals.css, never raw colors.
+ *
+ * Add a theme: copy a [data-theme] block below, add its id to src/lib/themes.ts and its name to
+ * t.theme.names in src/i18n/uz.ts. No component changes. `npm run check:contrast` must pass for every theme.
+ *
+ * The default theme is the plain :root, so a page without the theme script (or with an unknown cookie) is "mint".
+ * Rules for every theme:
+ * - Fills (primary, accent, status, category, tier) carry their own -contrast / -foreground ink.
+ * - Small colored text uses primary-text or accent-text, never the fill colors.
+ * - Every status and tier also shows a label or letter, never color alone.
+ */
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * mint (default): the team palette #EFFFFB page, #50D890 green, #4F98CA blue, #272727 text and dark surfaces.
+ * #50D890 and #4F98CA are fills and large graphics only: on light surfaces they fail as small text (1.8 / 3.05:1).
+ * Dark text on them: 8.2:1 and 4.8:1. Never white on #50D890. On #272727 both may be text (8.2 / 4.8:1).
+ * primary-text and accent-text are the same hues (about 148° and 205°), darkened to pass 4.5:1 on light surfaces.
+ * ------------------------------------------------------------------------------------------------------------- */
+:root,
+[data-theme="mint"] {
+  --radius: 0.875rem;
+
+  --background: #effffb;
+  --surface: #effffb;
+  --surface-raised: #fbfffe;
+  --surface-sunken: #e2f6ef;
+  --surface-inverse: #272727;
+  --surface-inverse-foreground: #effffb;
+  --surface-inverse-muted: #b9c8c3;
+  --inverse-accent: #50d890;
+
+  --text: #272727;
+  --muted: #e2f6ef;
+  --muted-foreground: #4a5753;
+  --border: #cfe6de;
+  --border-strong: #6f8a81;
+
+  --primary: #50d890;
+  --primary-contrast: #272727;
+  --primary-soft: #d3f6e3;
+  --primary-text: #1b6f44;
+  --primary-text-contrast: #ffffff;
+
+  --accent: #4f98ca;
+  --accent-contrast: #272727;
+  --accent-soft: #dcecf7;
+  --accent-text: #2a6891;
+
+  --success: #d3f6e3;
+  --success-foreground: #1b5a38;
+  --warning: #fcefd2;
+  --warning-foreground: #6b4e12;
+  --danger: #fbe0e2;
+  --danger-foreground: #8a2b36;
+  --destructive: #b0323e;
+  --destructive-foreground: #ffffff;
+
+  --category-scientific: #d3f6e3;
+  --category-scientific-foreground: #1b5a38;
+  --category-innovation: #dcecf7;
+  --category-innovation-foreground: #1f4d6c;
+  --category-social: #fbe7d8;
+  --category-social-foreground: #6e3a1e;
+  --category-personal: #d6f1f0;
+  --category-personal-foreground: #155452;
+
+  /* Tiers by position (1 = best). The letter is always shown. */
+  --tier-1: #272727;
+  --tier-1-foreground: #50d890;
+  --tier-2: #50d890;
+  --tier-2-foreground: #272727;
+  --tier-3: #4f98ca;
+  --tier-3-foreground: #272727;
+  --tier-4: #bfeed5;
+  --tier-4-foreground: #1b5a38;
+  --tier-5: #cfe4f3;
+  --tier-5-foreground: #1f4d6c;
+  --tier-6: #e2f1ec;
+  --tier-6-foreground: #34504a;
+  --tier-7: #eceeed;
+  --tier-7-foreground: #3d4442;
+
+  --overlay: rgb(39 39 39 / 0.55);
+  --ring: #2a6891;
+
+  --elevation-card: 0 1px 2px rgb(39 39 39 / 0.05), 0 4px 14px -6px rgb(39 39 39 / 0.1);
+  --elevation-raised: 0 10px 30px -12px rgb(39 39 39 / 0.25), 0 3px 8px -3px rgb(39 39 39 / 0.1);
+  --elevation-nav: 0 8px 28px -10px rgb(39 39 39 / 0.22), 0 1px 3px rgb(39 39 39 / 0.06);
+}
+
+/* ---------------------------------------------------------------------------------------------------------------
+ * pastel: the original soft sage look, warm off-white and green, kept unchanged as the second theme.
+ * ------------------------------------------------------------------------------------------------------------- */
+[data-theme="pastel"] {
+  --radius: 0.75rem;
+
+  --background: #f8f7f2;
+  --surface: #f8f7f2;
+  --surface-raised: #ffffff;
+  --surface-sunken: #eef2ec;
+  --surface-inverse: #2c6a45;
+  --surface-inverse-foreground: #ffffff;
+  --surface-inverse-muted: #dbeee1;
+  --inverse-accent: #c8e6d0;
+
+  --text: #22312a;
+  --muted: #eef2ec;
+  --muted-foreground: #5a6a60;
+  --border: #dde5da;
+  --border-strong: #7f9285;
+
+  --primary: #9dd3ae;
+  --primary-contrast: #173323;
+  --primary-soft: #e4f3e8;
+  --primary-text: #2c6a45;
+  --primary-text-contrast: #ffffff;
+
+  --accent: #e4f3e8;
+  --accent-contrast: #173323;
+  --accent-soft: #e4f3e8;
+  --accent-text: #2c6a45;
+
+  --success: #ddf0e2;
+  --success-foreground: #1f5133;
+  --warning: #fbefd5;
+  --warning-foreground: #6b4e12;
+  --danger: #f8dedf;
+  --danger-foreground: #7a2e36;
+  --destructive: #a23b47;
+  --destructive-foreground: #ffffff;
+
+  --category-scientific: #dcefe2;
+  --category-scientific-foreground: #1f4d33;
+  --category-innovation: #ebe4f7;
+  --category-innovation-foreground: #45306e;
+  --category-social: #fbe5d6;
+  --category-social-foreground: #6e3a1e;
+  --category-personal: #d8f0ec;
+  --category-personal-foreground: #14514c;
+
+  --tier-1: #c8e6d0;
+  --tier-1-foreground: #1b4a2a;
+  --tier-2: #d2ebe3;
+  --tier-2-foreground: #1d4a3f;
+  --tier-3: #e0ecd0;
+  --tier-3-foreground: #38481a;
+  --tier-4: #ebe8cf;
+  --tier-4-foreground: #474216;
+  --tier-5: #f3e0d2;
+  --tier-5-foreground: #5a321f;
+  --tier-6: #f2dbe1;
+  --tier-6-foreground: #5b2936;
+  --tier-7: #e6e8e6;
+  --tier-7-foreground: #3a403b;
+
+  --overlay: rgb(34 49 42 / 0.5);
+  --ring: #2c6a45;
+
+  --elevation-card: 0 1px 2px rgb(34 49 42 / 0.04);
+  --elevation-raised: 0 6px 20px -8px rgb(34 49 42 / 0.18), 0 2px 6px -2px rgb(34 49 42 / 0.08);
+  --elevation-nav: 0 6px 20px -8px rgb(34 49 42 / 0.18), 0 1px 3px rgb(34 49 42 / 0.05);
+}
+
+/* Shared aliases: every theme maps the shadcn/ui and legacy names onto its semantic tokens. */
+:root,
+[data-theme] {
+  --foreground: var(--text);
+  --card: var(--surface-raised);
+  --card-foreground: var(--text);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--text);
+  --primary-foreground: var(--primary-contrast);
+  --primary-strong: var(--primary-text);
+  --primary-strong-foreground: var(--primary-text-contrast);
+  --secondary: var(--primary-soft);
+  --secondary-foreground: var(--text);
+  --accent-foreground: var(--accent-contrast);
+  --input: var(--border-strong);
+  --status-pending: var(--warning);
+  --status-pending-foreground: var(--warning-foreground);
+  --status-approved: var(--success);
+  --status-approved-foreground: var(--success-foreground);
+  --status-rejected: var(--danger);
+  --status-rejected-foreground: var(--danger-foreground);
+  --card-hover-shadow: var(--elevation-raised);
+}

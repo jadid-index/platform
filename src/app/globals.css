@@ -2,111 +2,26 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/*
- * Jadid Index palette: soft pastels, sage/mint green primary. Light mode only for now.
- * This is the only place colors are defined. Components use the token classes
- * (bg-primary, text-muted-foreground, bg-status-pending, bg-tier-1, ...) and never raw hex values.
- *
- * Contrast (WCAG AA needs 4.5:1 for normal text):
- * - primary-foreground on primary: 8.1:1
- * - primary-strong-foreground (white) on primary-strong: 6.5:1 (the "strong" button)
- * - primary-strong on surface 6.0:1, on surface-raised 6.5:1, on primary-soft 5.6:1 (links, small green text)
- * - text on surface 12.7:1, muted-foreground on surface 5.3:1 and on muted 5.1:1
- * - every status / category / tier foreground on its own fill: 6.8:1 or more
- * Pastel fills (primary-soft, status, category, tier) are backgrounds only, never small text on their own.
- */
-:root {
-  --radius: 0.75rem;
-
-  /* Brand */
-  --primary: #9dd3ae;                  /* sage / mint green: buttons, active states */
-  --primary-foreground: #173323;       /* dark green text on primary */
-  --primary-soft: #e4f3e8;             /* light green fill: chips, highlights, active nav */
-  --primary-strong: #2c6a45;           /* green for links, icons, small text and AA-critical buttons */
-  --primary-strong-foreground: #ffffff;
-
-  /* Neutrals */
-  --surface: #f8f7f2;                  /* warm off-white page background */
-  --surface-raised: #ffffff;           /* cards, popovers, sidebar */
-  --text: #22312a;                     /* dark green-grey, never pure black */
-  --muted: #eef2ec;                    /* subtle fills */
-  --muted-foreground: #5a6a60;         /* secondary text */
-  --border: #dde5da;                   /* soft grey-green, thin */
-
-  /* Status: always paired with a label or icon */
-  --status-pending: #fbefd5;
-  --status-pending-foreground: #6b4e12;
-  --status-approved: #ddf0e2;
-  --status-approved-foreground: #1f5133;
-  --status-rejected: #f8dedf;
-  --status-rejected-foreground: #7a2e36;
-
-  /* Rubric categories: soft tints with dark text */
-  --category-scientific: #dcefe2;
-  --category-scientific-foreground: #1f4d33;
-  --category-innovation: #ebe4f7;
-  --category-innovation-foreground: #45306e;
-  --category-social: #fbe5d6;
-  --category-social-foreground: #6e3a1e;
-  --category-personal: #d8f0ec;
-  --category-personal-foreground: #14514c;
-
-  /* Tiers by position (1 = best): soft fills with dark ink, always shown with the tier letter.
-     Contrast of each ink on its fill: 7.6 to 8.8:1. Greens first, then warm neutrals; no blue or gold. */
-  --tier-1: #c8e6d0;
-  --tier-1-foreground: #1b4a2a;
-  --tier-2: #d2ebe3;
-  --tier-2-foreground: #1d4a3f;
-  --tier-3: #e0ecd0;
-  --tier-3-foreground: #38481a;
-  --tier-4: #ebe8cf;
-  --tier-4-foreground: #474216;
-  --tier-5: #f3e0d2;
-  --tier-5-foreground: #5a321f;
-  --tier-6: #f2dbe1;
-  --tier-6-foreground: #5b2936;
-  --tier-7: #e6e8e6;
-  --tier-7-foreground: #3a403b;
-
-  /* Errors (form messages, destructive actions) */
-  --destructive: #a23b47;
-  --destructive-foreground: #ffffff;
-
-  /* Soft green-grey shadow, used on hover only */
-  --card-hover-shadow: 0 6px 20px -8px rgb(34 49 42 / 0.18), 0 2px 6px -2px rgb(34 49 42 / 0.08);
-
-  /* shadcn/ui aliases, mapped onto the palette above */
-  --background: var(--surface);
-  --foreground: var(--text);
-  --card: var(--surface-raised);
-  --card-foreground: var(--text);
-  --popover: var(--surface-raised);
-  --popover-foreground: var(--text);
-  --secondary: var(--primary-soft);
-  --secondary-foreground: var(--primary-foreground);
-  --accent: var(--primary-soft);
-  --accent-foreground: var(--primary-foreground);
-  --input: var(--border);
-  --ring: var(--primary-strong);
-}
+/* Colors live only in src/styles/themes.css (one block per theme). This file maps them to Tailwind tokens. */
+@import "../styles/themes.css";
 
 @theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
 
   /* Type scale: display (hero), h1, h2, body, small */
   /* Fluid headings: about 28 / 22 / 17 px on a 375 px phone, capped at 40 / 28 / 20 px on desktop. */
-  --text-display: clamp(1.75rem, 1.2rem + 2.4vw, 2.5rem);
-  --text-display--line-height: 1.15;
-  --text-display--letter-spacing: -0.02em;
-  --text-display--font-weight: 700;
+  --text-display: clamp(2.125rem, 1.4rem + 3.4vw, 3.75rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.035em;
+  --text-display--font-weight: 800;
   --text-h1: clamp(1.375rem, 1.1rem + 1.2vw, 1.75rem);
   --text-h1--line-height: 1.25;
-  --text-h1--letter-spacing: -0.015em;
-  --text-h1--font-weight: 650;
+  --text-h1--letter-spacing: -0.03em;
+  --text-h1--font-weight: 800;
   --text-h2: clamp(1.0625rem, 0.95rem + 0.5vw, 1.25rem);
   --text-h2--line-height: 1.35;
-  --text-h2--letter-spacing: -0.01em;
-  --text-h2--font-weight: 600;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h2--font-weight: 700;
   --text-body: 1rem;
   --text-body--line-height: 1.6;
   --text-small: 0.875rem;
@@ -116,19 +31,42 @@
   --container-content: 75rem;
 
   --shadow-card-hover: var(--card-hover-shadow);
+  --shadow-card: var(--elevation-card);
+  --shadow-raised: var(--elevation-raised);
+  --shadow-nav: var(--elevation-nav);
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
   --color-primary-strong: var(--primary-strong);
   --color-primary-strong-foreground: var(--primary-strong-foreground);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-primary-text: var(--primary-text);
+  --color-primary-text-contrast: var(--primary-text-contrast);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-inverse-accent: var(--inverse-accent);
 
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-inverse-foreground: var(--surface-inverse-foreground);
+  --color-surface-inverse-muted: var(--surface-inverse-muted);
+  --color-border-strong: var(--border-strong);
+  --color-overlay: var(--overlay);
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
 
   --color-status-pending: var(--status-pending);
   --color-status-pending-foreground: var(--status-pending-foreground);
@@ -185,6 +123,13 @@
 }
 
 @layer base {
+  /* The floating nav's height plus its top margin: anchors, focused fields and sticky asides sit below it. */
+  :root {
+    --nav-offset: 5.5rem;
+  }
+  html {
+    scroll-padding-top: var(--nav-offset);
+  }
   * {
     @apply border-border outline-ring/50;
   }

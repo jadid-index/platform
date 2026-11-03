@@ -42,6 +42,11 @@ export const uz = {
     language: "Til",
     languageSoon: "tez orada",
     languages: { uz: "Oʻzbekcha", ru: "Русский", en: "English" } as Record<string, string>,
+    admin: "Boshqaruv",
+  },
+  theme: {
+    label: "Mavzu",
+    names: { mint: "Yalpiz", pastel: "Pastel" } as Record<string, string>,
   },
   home: {
     tagline: "Talabalar yutuqlari reytingi",
@@ -49,8 +54,13 @@ export const uz = {
     login: "Kirish",
     dashboard: "Kabinet",
     heroTitle: "Talabalar yutuqlari tan olinadigan joy",
+    // The hero headline in two parts; the second part is highlighted.
+    heroBadge: "Milliy talabalar reyting tizimi",
+    heroTitleLead: "Faollik, ilm va tashabbus –",
+    heroTitleAccent: "jadidchilik mezoni",
+    heroLadderLabel: "Darajalar, eng yuqorisidan boshlab",
     heroText:
-      "Ilmiy, innovatsion, ijtimoiy va shaxsiy yutuqlaringizni yuklang: koʻrib chiquvchi tasdiqlagach, ular sizning darajangizni belgilaydi.",
+      "Talabalarning ilmiy ishlari, ixtirolari, startap loyihalari va yutuqlarini yagona mezonlar asosida baholovchi platforma.",
     toDashboard: "Kabinetga oʻtish",
     toLeaderboard: "Reyting",
     countersLabel: "Platforma raqamlarda",
@@ -113,7 +123,7 @@ export const uz = {
     noTierSection: "Daraja yoʻq",
     sectionCount: "{n} talaba",
     worksCount: "{n} ta tasdiqlangan yutuq",
-    profileTierAllTime: "Eng yaxshi oʻquv yili boʻyicha daraja",
+    profileTierAllTime: "Oʻquv yili boʻyicha eng yaxshi daraja",
     profileTierYear: "{year} oʻquv yili",
     worksTitle: "Tasdiqlangan yutuqlar",
     noWorks: "Hali tasdiqlangan yutuqlar yoʻq.",

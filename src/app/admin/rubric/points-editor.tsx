@@ -241,7 +241,7 @@ function FillHelper({
   }
 
   const multInput = (id: string, labelText: string, value: string, onChange: (v: string) => void) => (
-    <div className="grid gap-1.5">
+    <div key={id} className="grid gap-1.5">
       <Label htmlFor={id} className="text-xs">
         {labelText}
       </Label>

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:contrast": "tsx scripts/check-contrast.ts",
     "test": "vitest run",
     "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "seed:demo": "tsx --env-file=.env.local --conditions=react-server --tsconfig tsconfig.json scripts/seed-demo.ts",

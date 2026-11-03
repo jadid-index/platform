@@ -1,15 +1,17 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Onest } from "next/font/google";
 
 import { AppShell } from "@/components/shell/app-shell";
 import { locale, t } from "@/i18n";
+import { THEME_BOOT_SCRIPT } from "@/lib/themes";
 
 import "./globals.css";
 
-// Inter covers Latin Extended (Uzbek oʻ, gʻ, ʼ) and Cyrillic (Russian), and has tabular figures.
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin", "latin-ext", "cyrillic"],
+// Onest: one sans family, 400 body to 800 headings. Checked glyph by glyph: Uzbek Latin (oʻ gʻ with U+02BB, ʼ U+02BC),
+// Russian Cyrillic and Uzbek Cyrillic (Ўў Ққ Ғғ Ҳҳ, in cyrillic-ext). Manrope lacks U+02BB, so it was not used.
+const onest = Onest({
+  variable: "--font-onest",
+  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
 });
 
 export const metadata: Metadata = {
@@ -22,9 +24,15 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// The theme is applied by a tiny script before the first paint (from the jadid-theme cookie), not by reading the
+// cookie on the server: that would make every page dynamic and drop the prerendered shell. Without the script or
+// with an unknown value the default theme (:root) shows. suppressHydrationWarning: the script sets data-theme.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang={locale} className={`${inter.variable} h-full antialiased`}>
+    <html lang={locale} className={`${onest.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
       <body className="min-h-full">
         <AppShell>{children}</AppShell>
       </body>

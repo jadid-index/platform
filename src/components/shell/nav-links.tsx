@@ -2,65 +2,37 @@ import { t } from "@/i18n";
 
 import { getShellViewer } from "./access";
 import { NavItem } from "./nav-item";
-import { NavLinkView } from "./nav-link-view";
-
-function Group({ title, children }: { title?: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1">
-      {title ? (
-        <p className="px-3 pt-4 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</p>
-      ) : null}
-      {children}
-    </div>
-  );
-}
+import { NavLinkView, type NavLayout } from "./nav-link-view";
 
 // Shown while the viewer is looked up. Static (no active state), so it can be prerendered.
-export function NavLinksFallback() {
-  return (
-    <Group>
-      <NavLinkView href="/" label={t.nav.home} icon="home" />
-      <NavLinkView href="/leaderboard" label={t.nav.leaderboard} icon="leaderboard" />
-    </Group>
-  );
+export function NavLinksFallback({ layout }: { layout: NavLayout }) {
+  return <NavLinkView href="/leaderboard" label={t.nav.leaderboard} icon="leaderboard" layout={layout} />;
 }
 
-// Grouped links for the viewer's role. Display only: every page and API route checks access on the server.
-export async function NavLinks() {
+// The links the viewer's role may open. Display only: every page and API route checks access on the server.
+// Home is the logo. Employers get no link yet: there is no employer screen.
+export async function NavLinks({ layout }: { layout: NavLayout }) {
   const viewer = await getShellViewer();
-  const isStudent = viewer.kind === "member" && viewer.active && viewer.role === "student";
-  const isReviewer =
-    viewer.kind === "member" && viewer.active && (viewer.role === "reviewer" || viewer.role === "admin");
-  const isAdmin = viewer.kind === "member" && viewer.active && viewer.role === "admin";
+  const member = viewer.kind === "member" && viewer.active ? viewer : null;
+  const isStudent = member?.role === "student";
+  const isReviewer = member?.role === "reviewer" || member?.role === "admin";
+  const isAdmin = member?.role === "admin";
 
   return (
     <>
-      <Group>
-        <NavItem href="/" label={t.nav.home} icon="home" />
-        <NavItem href="/leaderboard" label={t.nav.leaderboard} icon="leaderboard" />
-      </Group>
+      <NavItem href="/leaderboard" label={t.nav.leaderboard} icon="leaderboard" layout={layout} />
       {viewer.kind === "no-profile" ? (
-        <Group>
-          <NavItem href="/onboarding" label={t.nav.finishProfile} icon="onboarding" />
-        </Group>
+        <NavItem href="/onboarding" label={t.nav.finishProfile} icon="onboarding" layout={layout} />
       ) : null}
       {isStudent ? (
-        <Group title={t.nav.groupStudent}>
-          <NavItem href="/dashboard" label={t.nav.myAchievements} icon="achievements" />
-          <NavItem href="/achievements/new" label={t.nav.addAchievement} icon="add" />
-        </Group>
+        <>
+          <NavItem href="/dashboard" label={t.nav.myAchievements} icon="achievements" layout={layout} />
+          <NavItem href="/achievements/new" label={t.nav.addAchievement} icon="add" layout={layout} />
+        </>
       ) : null}
-      {isReviewer ? (
-        <Group title={t.nav.groupReviewer}>
-          <NavItem href="/review" label={t.nav.reviewQueue} icon="review" />
-        </Group>
-      ) : null}
+      {isReviewer ? <NavItem href="/review" label={t.nav.reviewQueue} icon="review" layout={layout} /> : null}
       {isAdmin ? (
-        <Group title={t.nav.groupAdmin}>
-          <NavItem href="/admin/users" label={t.nav.adminUsers} icon="users" />
-          <NavItem href="/admin/rubric" label={t.nav.adminRubric} icon="rubric" />
-          <NavItem href="/admin/audit" label={t.nav.adminAudit} icon="audit" />
-        </Group>
+        <NavItem href="/admin/users" match="/admin" label={t.nav.admin} icon="admin" layout={layout} />
       ) : null}
     </>
   );

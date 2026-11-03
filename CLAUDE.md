@@ -64,15 +64,26 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 
 - Language: Uzbek (Latin) is the default. Put all text in a translations file so Russian and English can be added.
 - Mobile first, with a full desktop layout from the lg breakpoint up. Test every screen at 375 px and at 1440 px wide.
-- Colors: a soft pastel palette with **green as the primary color**. No blue or gold branding.
-  Define the palette once as Tailwind theme tokens (primary, primary-soft, surface, border, text, muted, plus status colors).
-  No hard-coded hex values in components.
-  - Primary: sage / mint green. Buttons and active states use the primary token with dark enough text to pass
-    WCAG AA contrast (4.5:1). Pastel fills are for backgrounds and chips, not for small text.
-  - Neutrals: warm off-white surfaces, soft grey-green borders, a dark green-grey for text (never pure black).
-  - Status colors are pastel too, and every status also shows a label or icon, never color alone:
-    Pending = soft amber, Approved = green, Rejected = soft rose.
-  - Support light mode only for Thursday.
+- Colors: a theme system. All color values live in `src/styles/themes.css` (one `[data-theme]` block per theme),
+  mapped to Tailwind tokens in `src/app/globals.css`; the theme list is `src/lib/themes.ts`. Components use semantic
+  tokens only (background, surface, surface-raised, surface-inverse, border, border-strong, text, muted, primary,
+  primary-contrast, primary-text, accent, accent-contrast, accent-text, success, warning, danger, tier-*, category-*),
+  never hex values or Tailwind palette classes. Adding a theme must not touch any component.
+  - "mint" (default, the team palette): page #EFFFFB, primary #50D890, secondary blue #4F98CA, text and dark surfaces #272727.
+    Text on #EFFFFB is #272727. Fills of #50D890 or #4F98CA carry #272727 text, never white. Never use #50D890 or
+    #4F98CA as text on light surfaces; small green or blue text and links use the derived `primary-text` / `accent-text`
+    (same hues, darker, 4.5:1 or more). On #272727 surfaces #50D890 and #4F98CA may be text.
+  - "pastel": the original soft sage theme, kept as the second option.
+  - The viewer picks a theme in the top bar or the profile menu; it is saved in the `jadid-theme` cookie and applied
+    before first paint by the script in the root layout (unknown or missing value: mint).
+  - `npm run check:contrast` (also part of `npm test`) checks every text, button and border token pair in every theme
+    against WCAG AA (4.5:1 text, 3:1 large text and UI borders) and fails on raw colors in components. It must pass.
+  - Every status shows a label or icon and every tier its letter, never color alone.
+- Font: Onest (one family, next/font), 400 body and 800 headings. It covers Uzbek Latin (oʻ, gʻ with U+02BB, ʼ U+02BC),
+  Russian and Uzbek Cyrillic; check these glyphs before switching fonts.
+- Top floating pill navigation. No sidebar, except the secondary navigation inside /admin.
+  The pill shows the links the viewer's role may open; below lg it shrinks to logo plus a menu button that opens a
+  full-width sheet. Sticky offsets use `--nav-offset` (`top-(--nav-offset)`).
 - Use the component library. Do not build custom form controls for Thursday.
 - Every list and screen needs a loading state, an empty state and an error state.
 - Most important screens, in this order: leaderboard, reviewer review screen, add achievement, student dashboard, sign-up.
@@ -103,6 +114,7 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 - Install: `npm install`
 - Dev server: `npm run dev`
 - Type check and lint: `npm run lint` and `npx tsc --noEmit`
+- Contrast and raw-color check: `npm run check:contrast`
 - Tests: `npm test`. Integration tests against the Supabase project in `.env.test.local`, or `.env.local` if there
   is none. They create `test-...@example.invalid` users and remove them afterwards.
 - Live-app tests (cache, health, review route access): `npm run build && npx next start -p 3100`, then

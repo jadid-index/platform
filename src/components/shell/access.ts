@@ -12,7 +12,7 @@ export type ShellViewer =
   | { kind: "member"; name: string; role: Role; active: boolean };
 
 // Who is looking at the page, for the navigation only. Pages and API routes check access themselves.
-// cache(): the sidebar, the mobile drawer and the account menu share one lookup per request.
+// cache(): the pill links, the mobile menu sheet and the account menu share one lookup per request.
 export const getShellViewer = cache(async (): Promise<ShellViewer> => {
   const user = await getCurrentUser();
   if (!user) return { kind: "guest" };

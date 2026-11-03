@@ -19,7 +19,7 @@ export function StatTile({
   className?: string;
 }) {
   return (
-    <div className={cn("grid gap-1 rounded-xl border bg-surface-raised p-4", className)}>
+    <div className={cn("grid gap-1 rounded-2xl border bg-surface-raised p-4 shadow-card", className)}>
       <dt className="text-small text-muted-foreground">{label}</dt>
       <dd className={cn("text-h1 tabular", emphasis && "text-primary-strong")}>
         {value}
