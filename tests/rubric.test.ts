@@ -5,6 +5,7 @@ import {
   deleteAchievementType,
   getLeaderboard,
   getMeta,
+  getTotalPoints,
   saveAchievementType,
   setAchievementTypeActive,
   setCategoryCap,
@@ -101,8 +102,10 @@ async function reviewOf(submissionId: string) {
   return data;
 }
 
-const boardTotal = async (studentId: string) =>
-  (await getLeaderboard({ year: "all" })).rows.find((r) => r.student_id === studentId)?.total_points ?? null;
+// The owner's exact points (from the reviews ledger) and the public tier on the leaderboard.
+const boardTotal = async (studentId: string) => getTotalPoints(studentId);
+const boardTier = async (studentId: string) =>
+  (await getLeaderboard({ year: "all" })).rows.find((r) => r.student_id === studentId)?.tier?.code ?? null;
 
 async function auditCount(): Promise<number> {
   const { count, error } = await getAdminClient()
@@ -120,6 +123,7 @@ describe("approved points are snapshots", () => {
     const first = await insertPendingRow(s.id, { type_id: type.id, level: "national", result: "confirmed", achievement_date: "2025-10-01" });
     expect(await approveSubmission(first, reviewer.id, type.id, "national", "confirmed")).toMatchObject({ ok: true, points_awarded: 10 });
     expect(await boardTotal(s.id)).toBe(10);
+    const tierBefore = await boardTier(s.id);
 
     // A pending submission is evaluated with the rubric at approval time, not at submission time.
     const second = await insertPendingRow(s.id, { type_id: type.id, level: "national", result: "confirmed", achievement_date: "2025-10-02" });
@@ -129,6 +133,7 @@ describe("approved points are snapshots", () => {
 
     expect(await reviewOf(first)).toEqual({ rubric_points: 10, points_awarded: 10, category_code: CAT });
     expect(await boardTotal(s.id)).toBe(10);
+    expect(await boardTier(s.id)).toBe(tierBefore);
 
     // New rubric (40) and new cap (45): 10 already used, so 35 are awarded.
     expect(await approveSubmission(second, reviewer.id, type.id, "national", "confirmed")).toMatchObject({

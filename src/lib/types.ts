@@ -71,6 +71,7 @@ export type ReviewQueueItem = {
   student_name: string;
   faculty: string | null;
   flag_count: number | null; // recognition checks marked "check"; null when nothing could be compared
+  student_year_points: number; // reviewers see exact points: the student's total this academic year
 };
 
 export type SubmissionForReview = {
@@ -103,7 +104,7 @@ export type PointsPreview = {
 };
 
 // ------------------------------------------------------------- leaderboard
-// Public data only (CLAUDE.md rule 5): name, faculty, score, approved work titles, photo.
+// Public data only (CLAUDE.md rules 5 and 11): name, faculty, tier, approved works (no points), photo.
 
 export type LeaderboardYear = number | "all"; // start year (2026 = 2026/27) or all-time
 
@@ -113,22 +114,32 @@ export type LeaderboardFilters = {
   faculty_id?: number;
 };
 
+// A tier as the public sees it. Points never travel with it.
+export type PublicTier = { code: string; label: TypeName; sort_order: number }; // sort_order 1 = best
+export type Tier = PublicTier & { min_points: number }; // admin and owner views only
+
+// The signed-in student's own points and tier. Never sent to anyone else.
+export type OwnStanding = {
+  academic_year: number | null; // all-time: the best academic year (null when there is none)
+  points: number;
+  tier: PublicTier | null;
+};
+
 export type LeaderboardRow = {
-  rank: number;
   student_id: string;
   full_name: string;
   university: string;
   faculty: string | null;
   photo_url: string | null;
-  total_points: number;
   approved_count: number;
+  tier: PublicTier | null; // null: approved work, but below the lowest tier ("–")
 };
 
 export type Leaderboard = {
   academic_year: LeaderboardYear;
   current_academic_year: number;
   available_years: number[]; // newest first, always includes the current year
-  rows: LeaderboardRow[]; // every ranked row for these filters
+  rows: LeaderboardRow[]; // every row for these filters, by tier (best first) then name
   // Set when the default view fell back from an empty current year to the most recent year with data.
   fallback_from_year: number | null;
 };
@@ -139,7 +150,6 @@ export type PublicWork = {
   type_name: TypeName;
   level: RubricRow["level"];
   result: RubricRow["result"];
-  points_awarded: number;
   achievement_date: string;
 };
 
@@ -149,6 +159,15 @@ export type PublicStudent = {
   university: string;
   faculty: string | null;
   photo_url: string | null;
-  total_points: number;
+  approved_count: number;
+  tier: PublicTier | null; // all-time: the best academic year
+  current_year: { academic_year: number; tier: PublicTier | null };
   works: PublicWork[];
+};
+
+export type TopTier = {
+  academic_year: LeaderboardYear;
+  tier: PublicTier | null; // the best tier with anyone in it; null when nobody has a tier
+  rows: LeaderboardRow[];
+  total: number; // everyone in that tier
 };

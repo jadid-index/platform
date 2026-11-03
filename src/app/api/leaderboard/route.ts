@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 import { apiError } from "@/lib/api";
 import { getDefaultLeaderboard, getLeaderboard } from "@/lib/db";
@@ -6,10 +6,11 @@ import { leaderboardQuerySchema } from "@/lib/validation";
 
 // Public. Query: university_id, faculty_id, academic_year (start year or "all"), limit, offset.
 // Default is the current academic year; while it has no entries, the most recent year with data
-// (fallback_from_year is then set). Ranks are computed after filtering. No CDN caching: the server-side
+// (fallback_from_year is then set). Rows carry a tier, never points or a rank (CLAUDE.md rule 11),
+// ordered by tier (best first) and then by name. No CDN caching: the server-side
 // cache is purged on approval, a CDN copy would not be.
-export async function GET(request: NextRequest) {
-  const query = leaderboardQuerySchema.safeParse(Object.fromEntries(request.nextUrl.searchParams));
+export async function GET(request: Request) {
+  const query = leaderboardQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
   if (!query.success) return apiError(400, "invalid_query");
   const { limit, offset, academic_year, ...filters } = query.data;
 

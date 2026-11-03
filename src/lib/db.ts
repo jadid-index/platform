@@ -18,7 +18,11 @@ import type {
   RejectedSubmission,
   ReviewQueueItem,
   RubricRow,
+  OwnStanding,
+  PublicTier,
   SubmissionForReview,
+  Tier,
+  TopTier,
   TypeName,
   University,
 } from "@/lib/types";
@@ -34,6 +38,7 @@ import {
   type ProfileStatus,
   type Result,
   type Role,
+  type TierBody,
   type TypeBody,
 } from "@/lib/validation";
 
@@ -415,14 +420,81 @@ export async function listOwnSubmissions(studentId: string): Promise<OwnSubmissi
 }
 
 // All-time total, read from the leaderboard view (sum of points_awarded on approved reviews).
+// Exact points are for the owner, reviewers and admins only (rule 11); read them from the reviews ledger.
+// year = "all" sums every year (the all-time tier uses the best single year instead, see getBestYearPoints).
 export async function getTotalPoints(studentId: string): Promise<number> {
-  const { data, error } = await getAdminClient()
-    .from("leaderboard")
-    .select("total_points")
+  return sumApprovedPoints(studentId);
+}
+
+async function sumApprovedPoints(studentId: string, academicYear?: number): Promise<number> {
+  let query = getAdminClient()
+    .from("reviews")
+    .select("points_awarded")
     .eq("student_id", studentId)
-    .maybeSingle();
+    .eq("decision", "approved");
+  if (academicYear !== undefined) query = query.eq("academic_year", academicYear);
+  const { data, error } = await query;
   if (error) throw error;
-  return data?.total_points ?? 0;
+  return (data ?? []).reduce((sum, r) => sum + ((r.points_awarded as number | null) ?? 0), 0);
+}
+
+// Points per academic year for several students, for reviewer and admin screens.
+export async function getYearPointsFor(studentIds: string[], academicYear: number): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (studentIds.length === 0) return out;
+  const { data, error } = await getAdminClient()
+    .from("reviews")
+    .select("student_id, points_awarded")
+    .in("student_id", studentIds)
+    .eq("decision", "approved")
+    .eq("academic_year", academicYear);
+  if (error) throw error;
+  for (const r of data ?? []) out.set(r.student_id as string, (out.get(r.student_id as string) ?? 0) + ((r.points_awarded as number | null) ?? 0));
+  return out;
+}
+
+// The student's own standing for one academic year, or all-time (the best academic year, like the public
+// all-time tier). For the owner only: it carries exact points.
+export async function getOwnStanding(studentId: string, year: LeaderboardYear): Promise<OwnStanding> {
+  if (year !== "all") {
+    const points = await sumApprovedPoints(studentId, year);
+    return { academic_year: year, points, tier: await getTierFor(points) };
+  }
+  const { data, error } = await getAdminClient()
+    .from("reviews")
+    .select("academic_year, points_awarded")
+    .eq("student_id", studentId)
+    .eq("decision", "approved");
+  if (error) throw error;
+  const perYear = new Map<number, number>();
+  for (const r of data ?? []) {
+    const y = r.academic_year as number;
+    perYear.set(y, (perYear.get(y) ?? 0) + ((r.points_awarded as number | null) ?? 0));
+  }
+  let best: { year: number; points: number } | null = null;
+  for (const [y, p] of perYear) if (!best || p > best.points || (p === best.points && y > best.year)) best = { year: y, points: p };
+  const points = best?.points ?? 0;
+  return { academic_year: best?.year ?? null, points, tier: await getTierFor(points) };
+}
+
+// The tier for a number of points, from the tiers table (tier_for() in SQL). null below the lowest tier.
+export async function getTierFor(points: number): Promise<PublicTier | null> {
+  const { data, error } = await getAdminClient().rpc("tier_for", { p_points: points });
+  if (error) throw error;
+  const row = (data as { code: string; label: TypeName; sort_order: number }[] | null)?.[0];
+  return row ? { code: row.code, label: row.label, sort_order: row.sort_order } : null;
+}
+
+// Same rule as tier_for() in SQL, for a list already loaded: the highest min_points the points reach.
+export function tierFromList(points: number, tiers: Tier[]): PublicTier | null {
+  const t = tiers.filter((x) => x.min_points <= points).sort((a, b) => b.min_points - a.min_points)[0];
+  return t ? { code: t.code, label: t.label, sort_order: t.sort_order } : null;
+}
+
+export async function listTiers(): Promise<Tier[]> {
+  const { data, error } = await getAdminClient().from("tiers").select("code, label, min_points, sort_order").order("sort_order");
+  if (error) throw error;
+  return (data ?? []) as Tier[];
 }
 
 // Withdraws the student's own pending submission. Returns false if there is no such submission.
@@ -475,6 +547,11 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
     typeNames(),
   ]);
   if (subs.error) throw subs.error;
+  // Reviewers see exact points: each student's total in the current academic year.
+  const studentIds = [
+    ...new Set((subs.data ?? []).map((s) => (s.profiles as unknown as StudentEmbed | null)?.id).filter((x): x is string => !!x)),
+  ];
+  const yearPoints = await getYearPointsFor(studentIds, await getCurrentAcademicYear());
   return (subs.data ?? []).map((s) => {
     const student = s.profiles as unknown as StudentEmbed | null;
     return {
@@ -488,6 +565,7 @@ export async function listReviewQueue(): Promise<ReviewQueueItem[]> {
       student_name: student?.full_name ?? "",
       faculty: student?.faculties?.name ?? null,
       flag_count: flagCount(s.ai_extraction, student?.full_name ?? "", s.achievement_date, s.certificate_ref),
+      student_year_points: student ? (yearPoints.get(student.id) ?? 0) : 0,
     };
   });
 }
@@ -631,23 +709,46 @@ export async function getCurrentAcademicYear(): Promise<number> {
   return data as number;
 }
 
+// Public rows: tier, name, faculty and approved-work metadata. Never points, rank or approval times (rule 11);
+// the views do not have those columns.
 type LeaderboardViewRow = {
   student_id: string;
   full_name: string;
   photo_path: string | null;
   university: string;
   faculty: string | null;
-  total_points: number;
   approved_count: number;
+  tier_code: string | null;
+  tier_label: TypeName | null;
+  tier_sort: number | null;
 };
+
+const PUBLIC_ROW_COLUMNS =
+  "student_id, full_name, photo_path, university, faculty, approved_count, tier_code, tier_label, tier_sort";
 
 function avatarUrl(path: string | null): string | null {
   return path ? getAdminClient().storage.from("avatars").getPublicUrl(path).data.publicUrl : null;
 }
 
-// Every ranked row for the filters. year = null means the current academic year.
-// Rank is computed after filtering: points descending, ties go to the earlier last approval.
-// Students with no approved points are left out (leaderboard_by_year already omits them).
+function tierOf(r: { tier_code: string | null; tier_label: TypeName | null; tier_sort: number | null }): PublicTier | null {
+  return r.tier_code && r.tier_label && r.tier_sort !== null
+    ? { code: r.tier_code, label: r.tier_label, sort_order: r.tier_sort }
+    : null;
+}
+
+// Uzbek collation, case- and accent-insensitive, so "Gʻulom" and "gulom" sort together.
+const byName = new Intl.Collator("uz", { sensitivity: "base" });
+
+// Public order: tier (best first, no tier last), then name. There is no rank and no tie-breaking by approval.
+export function comparePublicRows(a: LeaderboardRow, b: LeaderboardRow): number {
+  const ta = a.tier?.sort_order ?? Number.MAX_SAFE_INTEGER;
+  const tb = b.tier?.sort_order ?? Number.MAX_SAFE_INTEGER;
+  return ta - tb || byName.compare(a.full_name, b.full_name) || a.student_id.localeCompare(b.student_id);
+}
+
+// Every row for the filters, in public order. year = null means the current academic year.
+// Only students with at least one approved work in the period are listed; the tier comes from that year's
+// points (all-time: the student's best academic year).
 export async function getLeaderboard(
   filters: Omit<LeaderboardFilters, "year"> & { year: LeaderboardYear | null },
 ): Promise<Leaderboard> {
@@ -659,34 +760,26 @@ export async function getLeaderboard(
   const currentYear = await getCurrentAcademicYear();
   const year = filters.year ?? currentYear;
 
-  let query = db
-    .from(year === "all" ? "leaderboard" : "leaderboard_by_year")
-    .select("student_id, full_name, photo_path, university, faculty, total_points, approved_count, last_approved_at")
-    .gt("total_points", 0);
+  let query = db.from(year === "all" ? "leaderboard" : "leaderboard_by_year").select(PUBLIC_ROW_COLUMNS);
   if (year !== "all") query = query.eq("academic_year", year);
   if (filters.university_id) query = query.eq("university_id", filters.university_id);
   if (filters.faculty_id) query = query.eq("faculty_id", filters.faculty_id);
 
-  const [list, years] = await Promise.all([
-    query
-      .order("total_points", { ascending: false })
-      .order("last_approved_at", { ascending: true })
-      .order("student_id", { ascending: true }),
-    db.from("leaderboard_by_year").select("academic_year"),
-  ]);
+  const [list, years] = await Promise.all([query, db.from("leaderboard_by_year").select("academic_year")]);
   if (list.error) throw list.error;
   if (years.error) throw years.error;
 
-  const rows: LeaderboardRow[] = ((list.data ?? []) as LeaderboardViewRow[]).map((r, i) => ({
-    rank: i + 1,
-    student_id: r.student_id,
-    full_name: r.full_name,
-    university: r.university,
-    faculty: r.faculty,
-    photo_url: avatarUrl(r.photo_path),
-    total_points: r.total_points,
-    approved_count: r.approved_count,
-  }));
+  const rows: LeaderboardRow[] = ((list.data ?? []) as LeaderboardViewRow[])
+    .map((r) => ({
+      student_id: r.student_id,
+      full_name: r.full_name,
+      university: r.university,
+      faculty: r.faculty,
+      photo_url: avatarUrl(r.photo_path),
+      approved_count: r.approved_count,
+      tier: tierOf(r),
+    }))
+    .sort(comparePublicRows);
   const available = new Set<number>([currentYear, ...(years.data ?? []).map((y) => y.academic_year as number)]);
 
   return {
@@ -711,44 +804,61 @@ export async function getDefaultLeaderboard(filters: Omit<LeaderboardFilters, "y
   return current;
 }
 
-// Public profile: approved works only, from public_works. Never includes files or file paths.
-// Returns null for anyone who is not an active student on the leaderboard.
+// Landing page: the best tier that has anyone in the default view, its first students by name, and how many
+// it has in total. Students without a tier never count as a top tier.
+export async function getTopTierStudents(limit: number): Promise<TopTier> {
+  const board = await getDefaultLeaderboard({});
+  const first = board.rows.find((r) => r.tier !== null);
+  if (!first) return { academic_year: board.academic_year, tier: null, rows: [], total: 0 };
+  const inTier = board.rows.filter((r) => r.tier?.code === first.tier!.code);
+  return { academic_year: board.academic_year, tier: first.tier, rows: inTier.slice(0, limit), total: inTier.length };
+}
+
+// Public profile: tier (best year, plus the current year), name, faculty and approved works with level and
+// result only. Never points, files or file paths. null for anyone who is not an active student with approved work.
 export async function getPublicStudent(studentId: string): Promise<PublicStudent | null> {
   "use cache: remote";
   cacheTag(LEADERBOARD_TAG);
   cacheLife(LEADERBOARD_CACHE);
 
   const db = getAdminClient();
-  const [student, works] = await Promise.all([
+  const currentYear = await getCurrentAcademicYear();
+  const [student, thisYear, works] = await Promise.all([
+    db.from("leaderboard").select(PUBLIC_ROW_COLUMNS).eq("student_id", studentId).maybeSingle(),
     db
-      .from("leaderboard")
-      .select("student_id, full_name, photo_path, university, faculty, total_points")
+      .from("leaderboard_by_year")
+      .select("tier_code, tier_label, tier_sort")
       .eq("student_id", studentId)
+      .eq("academic_year", currentYear)
       .maybeSingle(),
     db
       .from("public_works")
-      .select("title, type_id, type_name, level, result, points_awarded, achievement_date")
+      .select("title, type_id, type_name, level, result, achievement_date")
       .eq("student_id", studentId)
       .order("achievement_date", { ascending: false }),
   ]);
   if (student.error) throw student.error;
+  if (thisYear.error) throw thisYear.error;
   if (works.error) throw works.error;
   if (!student.data) return null;
 
+  const row = student.data as LeaderboardViewRow;
   return {
-    student_id: student.data.student_id,
-    full_name: student.data.full_name,
-    university: student.data.university,
-    faculty: student.data.faculty,
-    photo_url: avatarUrl(student.data.photo_path),
-    total_points: student.data.total_points,
+    student_id: row.student_id,
+    full_name: row.full_name,
+    university: row.university,
+    faculty: row.faculty,
+    photo_url: avatarUrl(row.photo_path),
+    approved_count: row.approved_count,
+    tier: tierOf(row),
+    current_year: {
+      academic_year: currentYear,
+      tier: thisYear.data ? tierOf(thisYear.data as LeaderboardViewRow) : null,
+    },
     works: (works.data ?? []) as PublicWork[],
   };
 }
 
-// Date of each student's most recent approved work in the given academic year (achievement_date from
-// public_works, which the consent notice makes public). The approval date itself is not public, so it is
-// never shown. A work belongs to the academic year of its achievement_date (SQL academic_year(): 1 September).
 export async function getLatestWorkDates(studentIds: string[], year: LeaderboardYear): Promise<Record<string, string>> {
   "use cache: remote";
   cacheTag(LEADERBOARD_TAG);
@@ -863,14 +973,7 @@ export async function getOwnRejectedSubmission(submissionId: string, studentId: 
 
 // The student's own points in one academic year (dashboard). Not cached: it is per user.
 export async function getYearPoints(studentId: string, academicYear: number): Promise<number> {
-  const { data, error } = await getAdminClient()
-    .from("leaderboard_by_year")
-    .select("total_points")
-    .eq("student_id", studentId)
-    .eq("academic_year", academicYear)
-    .maybeSingle();
-  if (error) throw error;
-  return data?.total_points ?? 0;
+  return sumApprovedPoints(studentId, academicYear);
 }
 
 // ---------------------------------------------------------------- storage
@@ -928,6 +1031,8 @@ export type AdminUser = {
   university: string | null;
   faculty: string | null;
   created_at: string;
+  year_points: number | null; // students only: approved points in the current academic year
+  tier: PublicTier | null;
 };
 
 export async function listUsersForAdmin(query: AdminUsersQuery): Promise<{ rows: AdminUser[]; total: number }> {
@@ -939,9 +1044,17 @@ export async function listUsersForAdmin(query: AdminUsersQuery): Promise<{ rows:
     p_offset: query.offset,
   });
   if (error) throw error;
-  const rows = (data ?? []) as (AdminUser & { total_count: number })[];
+  const rows = (data ?? []) as (Omit<AdminUser, "year_points" | "tier"> & { total_count: number })[];
+  // Admins see exact points: students' current-year points and the tier they give.
+  const students = rows.filter((r) => r.role === "student").map((r) => r.id);
+  const [points, tiers] = students.length
+    ? await Promise.all([getYearPointsFor(students, await getCurrentAcademicYear()), listTiers()])
+    : [new Map<string, number>(), [] as Tier[]];
   return {
-    rows: rows.map(withoutTotal),
+    rows: rows.map(withoutTotal).map((r) => {
+      const p = r.role === "student" ? (points.get(r.id) ?? 0) : null;
+      return { ...r, year_points: p, tier: p === null ? null : tierFromList(p, tiers) };
+    }),
     total: rows[0] ? Number(rows[0].total_count) : 0,
   };
 }
@@ -1010,19 +1123,20 @@ export async function listAuditActions(): Promise<string[]> {
 
 export type AdminCategory = { code: string; name: string; yearly_cap: number };
 export type AdminType = AchievementType & { in_use: boolean };
-export type AdminRubric = { categories: AdminCategory[]; types: AdminType[]; cells: RubricRow[] };
+export type AdminRubric = { categories: AdminCategory[]; types: AdminType[]; cells: RubricRow[]; tiers: Tier[] };
 
 // Everything the editor shows, inactive types included. in_use: a submission or review refers to the type, so it
 // cannot be deleted or switch has_placement.
 export async function getRubricForAdmin(): Promise<AdminRubric> {
   const db = getAdminClient();
-  const [categories, types, cells] = await Promise.all([
+  const [categories, types, cells, tiers] = await Promise.all([
     db.from("categories").select("code, name, yearly_cap").order("code"),
     db
       .from("achievement_types")
       .select("id, category_code, name, base_points, has_placement, proof_hint, active, certificate_ref_required")
       .order("id"),
     db.from("rubric_points").select("type_id, level, result, points").order("type_id"),
+    listTiers(),
   ]);
   for (const r of [categories, types, cells]) if (r.error) throw r.error;
 
@@ -1043,6 +1157,7 @@ export async function getRubricForAdmin(): Promise<AdminRubric> {
     categories: (categories.data ?? []) as AdminCategory[],
     types: list.map((x, i) => ({ ...x, in_use: inUse[i] })),
     cells: (cells.data ?? []) as RubricRow[],
+    tiers,
   };
 }
 
@@ -1084,4 +1199,21 @@ export function setRubricPoints(actorId: string, cells: PointsCell[], reason: st
 
 export function setCategoryCap(actorId: string, code: string, cap: number, reason: string) {
   return rubricCall<AdminCategory>("admin_set_category_cap", { p_actor: actorId, p_code: code, p_cap: cap, p_reason: reason });
+}
+
+// Tiers. The SQL functions check the admin and the reason, keep codes and thresholds unique, renumber
+// sort_order from min_points and write the audit row.
+export function saveTier(actorId: string, oldCode: string | null, body: TierBody) {
+  return rubricCall<Tier>("admin_save_tier", {
+    p_actor: actorId,
+    p_old_code: oldCode,
+    p_code: body.code,
+    p_label: body.label,
+    p_min: body.min_points,
+    p_reason: body.reason,
+  });
+}
+
+export function deleteTier(actorId: string, code: string, reason: string) {
+  return rubricCall<null>("admin_delete_tier", { p_actor: actorId, p_code: code, p_reason: reason });
 }

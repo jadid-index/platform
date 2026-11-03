@@ -24,14 +24,14 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
 | POST | `/api/profile` | new user | Create the profile after sign-up. Body: `full_name, university_id, faculty_id, course, consent_version`. Sets `consent_at = now()`, `status = active`. No email-domain or verification check in the pilot. |
-| GET | `/api/me` | any | Own profile, total points, rank. |
+| GET | `/api/me` | any | Own profile. For a student also, for `?academic_year` (default current): exact points, tier and per-category points toward the cap; and all-time (best academic year): points and tier. No rank. `no-store`. |
 | GET | `/api/meta` | any | Universities, faculties, achievement types, and the rubric rows for the dropdowns. |
 | POST | `/api/extract` | student | Upload one file, get AI-extracted fields back (section 4). Never blocks submission. |
 | POST | `/api/submissions` | student | Create a submission (section 2). |
 | GET | `/api/submissions` | student | Own submissions with status and rejection reason. |
 | POST | `/api/submissions/:id/withdraw` | student | Only while `pending`. Frees the file hash. |
-| GET | `/api/leaderboard` | public | Query: `university_id, faculty_id, course, academic_year, limit, offset`. Default is the current academic year (`leaderboard_by_year`); pass `academic_year=all` for the all-time view `leaderboard`. The response includes `available_years` for the year tabs. Rank is computed after filtering. |
-| GET | `/api/leaderboard/:studentId` | public | Approved works from `public_works`. Never returns the file. |
+| GET | `/api/leaderboard` | public | Query: `university_id, faculty_id, academic_year, limit, offset`. Default is the current academic year (`leaderboard_by_year`); pass `academic_year=all` for the all-time view `leaderboard`. The response includes `available_years` for the year tabs. Rows: `student_id, full_name, university, faculty, photo_url, approved_count, tier {code, label, sort_order} \| null`, ordered by tier (best first) then name. No points, rank or approval time. |
+| GET | `/api/leaderboard/:studentId` | public | Name, faculty, `tier` (best academic year), `current_year.tier`, `approved_count`, and approved works (title, type, level, result, date). No points, never the file. |
 | GET | `/api/review/queue` | R | Pending submissions, oldest first. |
 | GET | `/api/review/submissions/:id` | R | Submission, signed file URL, `ai_flags`, and the points preview. |
 | POST | `/api/review/submissions/:id/check` | R | Runs the recognition check (section 5), stores `ai_flags`. |
@@ -46,6 +46,9 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = 
 | DELETE | `/api/admin/rubric/types/:id` | A | Body `{ reason }`. Only a type no submission or review refers to; otherwise deactivate it. |
 | PUT | `/api/admin/rubric/points` | A | Body `{ cells: [{ type_id, level, result, points \| null }], reason }`, up to 200, all or nothing. `null` removes an unused cell. |
 | PATCH | `/api/admin/rubric/categories/:code` | A | Body `{ yearly_cap, reason }`. |
+| POST | `/api/admin/tiers` | A | Body `{ code, label {uz, en?}, min_points, reason }`. |
+| PATCH | `/api/admin/tiers/:code` | A | The same body (code may change). `sort_order` is renumbered from `min_points`. |
+| DELETE | `/api/admin/tiers/:code` | A | Body `{ reason }`. The last tier cannot be deleted. |
 
 The points preview on the review screen is: rubric points for the chosen combination, points the student
 already has in that category and academic year, and points that would be awarded after the cap.
@@ -137,6 +140,21 @@ After that, further admins and reviewers are promoted on `/admin/users`.
   16 other international journal (international 24).
 - The fill helper on the editor computes `round(base × level multiplier × result multiplier)`, clamped to the cap,
   shows the old → new preview and saves only after the admin confirms with a reason.
+
+## 3c. Tiers (what the public sees instead of points)
+
+- Public views and APIs return a tier, never points, ranks or approval-order data (CLAUDE.md rule 11). Exact points:
+  the owner (dashboard, `/api/me`), reviewers (queue, review screen) and admins (user list, audit log).
+- `tiers (code, label, min_points, sort_order)`, edited on `/admin/rubric` with a reason and an audit row.
+  `sort_order` (1 = best) is always renumbered from `min_points`. Placeholders for 4 categories × 100 = 400 points
+  a year: S+ ≥ 360, S ≥ 300, A+ ≥ 240, A ≥ 180, B ≥ 120, C ≥ 60, D ≥ 1. Below the lowest threshold (0 points): no tier, "–".
+- `tier_for(points)` picks the tier. `leaderboard_by_year` uses that year's points; `leaderboard` (all-time) uses the
+  student's best academic year, so both are on the same 0–400 scale. Tiers are computed live: a threshold change
+  re-tiers everyone at once, while the points themselves never change.
+- Public order: tier (best first, "–" last), then name (Uzbek collation). The old tie-break by approval date is gone.
+  Only students with at least one approved work in the period are listed; hidden profiles never.
+- Landing page: "Top tier students" shows the best non-empty tier of the default view, first names alphabetically.
+- Profile page: the all-time tier as the headline badge, plus the current academic year's tier.
 
 ## 4. AI extraction (`POST /api/extract`)
 
@@ -253,6 +271,7 @@ Decided by the team:
 - Faculties: Islamic Studies, Classical Oriental Philology, Islamic Economics and International Relations (one faculty).
 - `iiau.uz` stays in `allowed_email_domains` as a future verification signal.
 - The default leaderboard shows the current academic year, with tabs for earlier years and all-time.
+- The `/leaderboard` page has two layouts: tier sections (default) and `?view=list`, one flat list in the same order with a tier badge per row. The view is page-only; `/api/leaderboard` is unchanged.
 - Contact email in the consent notice: fazlddn4@gmail.com.
 
 Still open:

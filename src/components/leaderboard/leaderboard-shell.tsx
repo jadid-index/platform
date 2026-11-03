@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { Layers, List, Search, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { academicYearLabel, t } from "@/i18n";
+import { DEFAULT_VIEW, type LeaderboardView } from "@/lib/leaderboard-view";
 import type { LeaderboardYear, University } from "@/lib/types";
 
 const ALL = "all";
@@ -18,7 +19,7 @@ const BASE = "/leaderboard";
 const SEARCH_DELAY_MS = 350;
 
 // Year tabs, name search and university / faculty filters. State lives in the URL
-// (?year=&q=&university=&faculty=), so a filtered view can be shared. The list dims while the next view loads.
+// (?year=&q=&university=&faculty=&view=), so a filtered view can be shared. The list dims while the next view loads.
 export function LeaderboardShell({
   years,
   year,
@@ -26,6 +27,7 @@ export function LeaderboardShell({
   universityId,
   facultyId,
   query,
+  view,
   children,
 }: {
   years: number[];
@@ -34,6 +36,7 @@ export function LeaderboardShell({
   universityId?: number;
   facultyId?: number;
   query: string;
+  view: LeaderboardView;
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -82,6 +85,20 @@ export function LeaderboardShell({
           ))}
           <TabsTrigger value={ALL} className="flex-none px-3 py-1.5">
             {t.leaderboard.allTime}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {/* Layout only: both views show the same rows in the same order. The default keeps a clean URL. */}
+      <Tabs value={view} onValueChange={(v) => navigate({ view: v === DEFAULT_VIEW ? null : v })}>
+        <TabsList aria-label={t.leaderboard.viewLabel}>
+          <TabsTrigger value="tiers" className="gap-1.5 px-3 py-1.5">
+            <Layers className="size-4" aria-hidden />
+            {t.leaderboard.viewTiers}
+          </TabsTrigger>
+          <TabsTrigger value="list" className="gap-1.5 px-3 py-1.5">
+            <List className="size-4" aria-hidden />
+            {t.leaderboard.viewList}
           </TabsTrigger>
         </TabsList>
       </Tabs>

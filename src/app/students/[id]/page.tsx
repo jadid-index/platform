@@ -3,17 +3,17 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { z } from "zod";
 
-import { Card, CardContent, EmptyState, ErrorState, SectionHeader } from "@/components/ds";
+import { Card, CardContent, EmptyState, ErrorState, SectionHeader, TierBadge } from "@/components/ds";
 import { LoadingState } from "@/components/loading-state";
 import { StudentAvatar } from "@/components/student-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { typeName, format, formatDate, t } from "@/i18n";
+import { academicYearLabel, format, formatDate, t, typeName } from "@/i18n";
 import { getPublicStudent } from "@/lib/db";
 import type { PublicStudent } from "@/lib/types";
 
 export const metadata: Metadata = { title: `${t.leaderboard.title} · ${t.common.appName}` };
 
-// Public profile: name, faculty, score and approved works. Never files.
+// Public profile: name, faculty, tier and approved works (level and result only). Never points or files.
 export default function StudentPage({ params }: PageProps<"/students/[id]">) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -57,11 +57,22 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
             <p className="text-sm text-muted-foreground">
               {[student.faculty, student.university].filter(Boolean).join(" · ")}
             </p>
-            <p className="text-sm">
-              {t.leaderboard.totalAllTime}:{" "}
-              <span className="font-semibold text-primary-strong tabular">
-                {format(t.leaderboard.points, { points: student.total_points })}
-              </span>
+            <p className="text-sm text-muted-foreground">{format(t.leaderboard.worksCount, { n: student.approved_count })}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tiers only: the headline is the best academic year (as on the all-time tab), plus this year's tier. */}
+      <Card className="py-4">
+        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 px-4">
+          <div className="flex items-center gap-3">
+            <TierBadge tier={student.tier} size="lg" />
+            <p className="text-small font-medium">{t.leaderboard.profileTierAllTime}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <TierBadge tier={student.current_year.tier} size="sm" />
+            <p className="text-small text-muted-foreground">
+              {format(t.leaderboard.profileTierYear, { year: academicYearLabel(student.current_year.academic_year) })}
             </p>
           </div>
         </CardContent>
@@ -77,10 +88,7 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
               <li key={`${w.title}-${w.achievement_date}-${i}`}>
                 <Card className="py-3">
                   <CardContent className="grid gap-1 px-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium break-words">{w.title}</p>
-                      <span className="shrink-0 font-semibold text-primary-strong tabular">+{w.points_awarded}</span>
-                    </div>
+                    <p className="font-medium break-words">{w.title}</p>
                     <p className="text-sm text-muted-foreground">
                       {typeName(w.type_name)} · {t.levels[w.level]}
                       {w.result !== "confirmed" ? ` · ${t.results[w.result]}` : ""}

@@ -17,11 +17,13 @@ const BASE = process.env.E2E_BASE_URL;
 const local = testRun("e2e");
 const YEAR = 2023;
 
-async function boardHas(studentId: string): Promise<number | null> {
+// The public row's tier code ("" for approved work without a tier), or null when the student is not listed.
+async function boardHas(studentId: string): Promise<string | null> {
   const res = await fetch(`${BASE}/api/leaderboard?academic_year=${YEAR}&limit=200`);
   expect(res.status).toBe(200);
-  const body = (await res.json()) as { rows: { student_id: string; total_points: number }[] };
-  return body.rows.find((r) => r.student_id === studentId)?.total_points ?? null;
+  const body = (await res.json()) as { rows: { student_id: string; tier: { code: string } | null }[] };
+  const row = body.rows.find((r) => r.student_id === studentId);
+  return row ? (row.tier?.code ?? "") : null;
 }
 
 describe.skipIf(!BASE)("live app", () => {
@@ -60,7 +62,6 @@ describe.skipIf(!BASE)("live app", () => {
       body: JSON.stringify({ type_id: choice.type_id, level: choice.level, result: choice.result }),
     });
     expect(res.status).toBe(200);
-    const approved = (await res.json()) as { points_awarded: number };
 
     const started = Date.now();
     let seen = await boardHas(student.id);
@@ -69,7 +70,39 @@ describe.skipIf(!BASE)("live app", () => {
       seen = await boardHas(student.id);
     }
     console.log(`PROBE appeared after ${Date.now() - started} ms:`, seen);
-    expect(seen).toBe(approved.points_awarded);
+    expect(seen).not.toBeNull();
+  });
+
+  it("public JSON carries no points, rank or approval-order data", async () => {
+    const forbidden = /"[a-z_]*(points?|rank|score|approved_at|reviewed_at|last_approved)[a-z_]*"\s*:/i;
+    for (const path of [
+      "/api/leaderboard",
+      "/api/leaderboard?academic_year=all",
+      `/api/leaderboard?academic_year=${YEAR}&limit=200`,
+      `/api/leaderboard/${student.id}`,
+    ]) {
+      const res = await fetch(`${BASE}${path}`);
+      const text = await res.text();
+      expect(text, path).not.toMatch(forbidden);
+    }
+  });
+
+  it("the list view shows the same students in one list, without points", async () => {
+    // Runs after the approval test, so the probe student is on the 2023 board.
+    const page = async (qs: string) => {
+      const res = await fetch(`${BASE}/leaderboard?${qs}`);
+      expect(res.status).toBe(200);
+      return res.text();
+    };
+    const tiers = await page(`year=${YEAR}`);
+    const list = await page(`year=${YEAR}&view=list`);
+    for (const html of [tiers, list]) expect(html).toContain(`/students/${student.id}`);
+    expect(tiers).toMatch(/id="tier-[^"]+"/);
+    expect(list).not.toMatch(/id="tier-[^"]+"/);
+    // The only "ball" text allowed is the yearly maximum in the explanation line.
+    expect(list.replaceAll("400 ball", "")).not.toMatch(/\d+\s*ball/);
+    // The switch keeps the other filters; "show more" keeps the view.
+    expect(await page(`year=all&view=list&limit=1`)).not.toContain("view=tiers");
   });
 
   it("review routes refuse a student session and no session", async () => {

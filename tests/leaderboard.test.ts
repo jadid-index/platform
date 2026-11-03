@@ -42,48 +42,50 @@ beforeAll(async () => {
   for (const key of ["first", "second", "top", "hidden"] as const) {
     students[key] = await createTestStudent(local(key), `LB ${key}`);
   }
-  // first and second tie on points; first was approved earlier. top has more points.
-  await approve(students.first, small, "[TEST] Ochiq ish nomi");
+  // "second" is approved first but sorts after "first" by name in the same tier; "top" has more points.
   await approve(students.second, small);
+  await approve(students.first, small, "[TEST] Ochiq ish nomi");
   await approve(students.top, small);
   await approve(students.top, other);
   await approve(students.hidden, other);
 });
 
 describe("leaderboard", () => {
-  it("ranks by points, ties broken by the earlier approval", async () => {
+  it("groups by tier (best first) and sorts by name within a tier, never by approval time", async () => {
     const rows = await testRows();
-    const order = rows.map((r) => r.student_id);
-    expect(order.indexOf(students.top.id)).toBeLessThan(order.indexOf(students.first.id));
-    expect(order.indexOf(students.first.id)).toBeLessThan(order.indexOf(students.second.id));
     const first = rows.find((r) => r.student_id === students.first.id)!;
     const second = rows.find((r) => r.student_id === students.second.id)!;
-    expect(first.total_points).toBe(second.total_points);
-    expect(first.rank).toBeLessThan(second.rank);
+    const top = rows.find((r) => r.student_id === students.top.id)!;
+    // Same points, so the same tier; "LB first" < "LB second" although "second" was approved earlier.
+    expect(first.tier).toEqual(second.tier);
+    const order = rows.map((r) => r.student_id);
+    expect(order.indexOf(students.first.id)).toBeLessThan(order.indexOf(students.second.id));
+    // A better tier always comes first (sort_order 1 = best; no tier last).
+    const sort = (r: typeof top) => r.tier?.sort_order ?? Infinity;
+    for (let i = 1; i < rows.length; i++) expect(sort(rows[i - 1])).toBeLessThanOrEqual(sort(rows[i]));
+    expect(sort(top)).toBeLessThanOrEqual(sort(first));
   });
 
   it("hides a profile whose status is not active", async () => {
     expect((await testRows()).some((r) => r.student_id === students.hidden.id)).toBe(true);
-    await setProfileStatus(students.hidden.id, "rejected");
+    await setProfileStatus(students.hidden.id, "hidden");
     expect((await testRows()).some((r) => r.student_id === students.hidden.id)).toBe(false);
     expect((await getLeaderboard({ year: "all" })).rows.some((r) => r.student_id === students.hidden.id)).toBe(false);
     expect(await getPublicStudent(students.hidden.id)).toBeNull();
   });
 
-  it("returns only public fields (no email, file path or private profile columns)", async () => {
+  it("returns only public fields: no points, rank, approval time, email, file path or private columns", async () => {
     const row = (await testRows())[0];
     expect(Object.keys(row).sort()).toEqual(
-      ["approved_count", "faculty", "full_name", "photo_url", "rank", "student_id", "total_points", "university"].sort(),
+      ["approved_count", "faculty", "full_name", "photo_url", "student_id", "tier", "university"].sort(),
     );
     const profile = (await getPublicStudent(students.first.id))!;
     expect(Object.keys(profile).sort()).toEqual(
-      ["faculty", "full_name", "photo_url", "student_id", "total_points", "university", "works"].sort(),
+      ["approved_count", "current_year", "faculty", "full_name", "photo_url", "student_id", "tier", "university", "works"].sort(),
     );
-    expect(Object.keys(profile.works[0]).sort()).toEqual(
-      ["achievement_date", "level", "points_awarded", "result", "title", "type_id", "type_name"].sort(),
-    );
+    expect(Object.keys(profile.works[0]).sort()).toEqual(["achievement_date", "level", "result", "title", "type_id", "type_name"].sort());
     const json = JSON.stringify(profile);
     // Keys only ("course" also appears in type names such as "Professional course certificate").
-    expect(json).not.toMatch(/@example\.invalid|"file_path"|"file_sha256"|"course"|"telegram"|"bio"|"consent_\w+"|"email"/);
+    expect(json).not.toMatch(/@example\.invalid|"file_path"|"file_sha256"|"course"|"telegram"|"bio"|"consent_\w+"|"email"|"points|"rank"/);
   });
 });

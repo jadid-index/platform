@@ -12,16 +12,17 @@ import {
   CardTitle,
   EmptyState,
   ErrorState,
-  RankBadge,
   SectionHeader,
   Skeleton,
   StatTile,
+  TierBadge,
 } from "@/components/ds";
+import { StudentAvatar } from "@/components/student-avatar";
 import { getShellViewer } from "@/components/shell/access";
 import { Button } from "@/components/ui/button";
-import { academicYearLabel, format, t } from "@/i18n";
-import { getDefaultLeaderboard, getPublicCounts, type PublicCounts } from "@/lib/db";
-import type { Leaderboard } from "@/lib/types";
+import { academicYearLabel, format, t, typeName } from "@/i18n";
+import { getPublicCounts, getTopTierStudents, type PublicCounts } from "@/lib/db";
+import type { TopTier } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const CONTACT_EMAIL = "fazlddn4@gmail.com";
@@ -209,11 +210,12 @@ function CountersSkeleton() {
   );
 }
 
-// Top 5 of the default leaderboard view (same source and order as /leaderboard): name, faculty, points.
+// The best non-empty tier of the default leaderboard view (same source and order as /leaderboard):
+// its first students by name, with a link to the rest. No points, no ranks.
 async function TopStudents() {
-  let board: Leaderboard;
+  let top: TopTier;
   try {
-    board = await getDefaultLeaderboard({});
+    top = await getTopTierStudents(TOP_COUNT);
   } catch (error) {
     console.error("load top students failed", error);
     return (
@@ -222,49 +224,64 @@ async function TopStudents() {
       </TopCard>
     );
   }
-  const top = board.rows.slice(0, TOP_COUNT);
-  const description =
-    board.academic_year === "all"
-      ? t.home.topAllTime
-      : format(t.home.topYear, { year: academicYearLabel(board.academic_year) });
+  const period =
+    top.academic_year === "all" ? t.home.topAllTime : format(t.home.topYear, { year: academicYearLabel(top.academic_year) });
+
+  if (!top.tier) {
+    return (
+      <TopCard description={period}>
+        <EmptyState icon={Trophy} text={t.leaderboard.emptyAll} />
+      </TopCard>
+    );
+  }
 
   return (
-    <TopCard description={description}>
-      {top.length === 0 ? (
-        <EmptyState icon={Trophy} text={t.leaderboard.emptyAll} />
-      ) : (
-        <ol className="grid gap-1">
-          {top.map((row) => (
-            <li key={row.student_id}>
-              <Link
-                href={`/students/${row.student_id}`}
-                className="flex items-center gap-3 rounded-lg px-2 py-2 outline-none hover:bg-primary-soft/60 focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                <RankBadge rank={row.rank} />
-                <span className="grid min-w-0 flex-1">
-                  <span className="truncate font-medium">{row.full_name}</span>
-                  {row.faculty ? <span className="truncate text-small text-muted-foreground">{row.faculty}</span> : null}
-                </span>
-                <span className="shrink-0 font-semibold text-primary-strong tabular">
-                  {format(t.leaderboard.points, { points: row.total_points })}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ol>
-      )}
+    <TopCard
+      description={format(t.home.topTier, { tier: typeName(top.tier.label), period })}
+      badge={<TierBadge tier={top.tier} />}
+    >
+      <ul className="grid gap-1">
+        {top.rows.map((row) => (
+          <li key={row.student_id}>
+            <Link
+              href={`/students/${row.student_id}`}
+              className="flex items-center gap-3 rounded-lg px-2 py-2 outline-none hover:bg-primary-soft/60 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            >
+              <StudentAvatar name={row.full_name} url={row.photo_url} className="size-8" />
+              <span className="grid min-w-0 flex-1">
+                <span className="truncate font-medium">{row.full_name}</span>
+                {row.faculty ? <span className="truncate text-small text-muted-foreground">{row.faculty}</span> : null}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {top.total > top.rows.length ? (
+        <p className="px-2 text-small text-muted-foreground">{format(t.home.topMore, { n: top.total - top.rows.length })}</p>
+      ) : null}
     </TopCard>
   );
 }
 
-function TopCard({ description, children }: { description: string | null; children: React.ReactNode }) {
+function TopCard({
+  description,
+  badge,
+  children,
+}: {
+  description: string | null;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <Card className="h-full gap-4 py-5">
-      <CardHeader className="px-5">
-        <CardTitle id="top-title" className="text-h2">
-          {t.home.topTitle}
-        </CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
+      <CardHeader className="flex items-start gap-3 px-5">
+        {badge}
+        <div className="grid gap-1.5">
+          <CardTitle id="top-title" className="text-h2">
+            {t.home.topTitle}
+          </CardTitle>
+          {description ? <CardDescription>{description}</CardDescription> : null}
+        </div>
       </CardHeader>
       <CardContent className="grid gap-3 px-3 sm:px-4">
         {children}

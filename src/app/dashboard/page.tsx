@@ -17,6 +17,7 @@ import {
   SectionHeader,
   Skeleton,
   StatTile,
+  TierBadge,
 } from "@/components/ds";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -26,15 +27,15 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   getCategoryProgress,
   getCurrentAcademicYear,
-  getLeaderboard,
+  getOwnStanding,
   getProfileSummary,
   getStudentYears,
-  getYearPoints,
   listOwnSubmissions,
+  listTiers,
   type CategoryProgress,
   type ProfileSummary,
 } from "@/lib/db";
-import type { OwnSubmission } from "@/lib/types";
+import type { OwnSubmission, PublicTier, Tier } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 import { WithdrawButton } from "./withdraw-button";
@@ -109,8 +110,8 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/da
   );
 }
 
-// Points total, rank and per-category progress for one academic year. All numbers are read as stored:
-// totals and rank from the leaderboard views, category points from the approved reviews.
+// The student's own exact points, own tier and per-category progress for one academic year, read from the
+// approved reviews. Only the owner sees the points; the public sees the tier. There is no rank.
 async function YearStats({
   studentId,
   searchParams,
@@ -121,7 +122,8 @@ async function YearStats({
   let years: number[];
   let year: number;
   let points: number;
-  let rank: number | null;
+  let tier: PublicTier | null;
+  let next: Tier | null;
   let categories: CategoryProgress[];
   try {
     const [current, ownYears, sp] = await Promise.all([
@@ -132,13 +134,15 @@ async function YearStats({
     years = [...new Set([current, ...ownYears])].sort((a, b) => b - a);
     const asked = Number(sp.year);
     year = years.includes(asked) ? asked : current;
-    const [yearPoints, board, progress] = await Promise.all([
-      getYearPoints(studentId, year),
-      getLeaderboard({ year }),
+    const [standing, tiers, progress] = await Promise.all([
+      getOwnStanding(studentId, year),
+      listTiers(),
       getCategoryProgress(studentId, year),
     ]);
-    points = yearPoints;
-    rank = board.rows.find((r) => r.student_id === studentId)?.rank ?? null;
+    points = standing.points;
+    tier = standing.tier;
+    // The next better tier: the lowest threshold above the current points.
+    next = [...tiers].sort((a, b) => a.min_points - b.min_points).find((x) => x.min_points > points) ?? null;
     categories = progress;
   } catch (error) {
     console.error("load dashboard stats failed", error);
@@ -156,7 +160,7 @@ async function YearStats({
     <Card className="gap-4 py-5">
       <CardContent className="grid gap-5 px-5">
         {years.length > 1 ? <YearTabs years={years} year={year} /> : null}
-        {/* The total matches this year's leaderboard tab, so the rank is the place shown there. */}
+        {/* The tier matches this year's leaderboard tab; the points are shown to the owner only. */}
         <dl className="grid grid-cols-2 gap-3">
           <StatTile
             emphasis
@@ -167,9 +171,13 @@ async function YearStats({
             className="p-3"
           />
           <StatTile
-            label={t.dashboard.rank}
-            value={rank ? format(t.dashboard.rankValue, { rank }) : t.dashboard.rankNone}
-            hint={format(t.dashboard.rankHint, { year: yearLabel })}
+            label={t.dashboard.tier}
+            value={tier ? <TierBadge tier={tier} /> : t.dashboard.tierNone}
+            hint={
+              next
+                ? format(t.dashboard.nextTier, { tier: typeName(next.label), n: next.min_points - points })
+                : format(t.dashboard.tierHint, { year: yearLabel })
+            }
             className="p-3"
           />
         </dl>

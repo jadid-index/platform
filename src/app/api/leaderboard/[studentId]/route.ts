@@ -4,7 +4,8 @@ import { z } from "zod";
 import { apiError } from "@/lib/api";
 import { getPublicStudent } from "@/lib/db";
 
-// Public. A student's approved works from public_works. Never returns files or file paths.
+// Public. Tier (best year and this year), name, faculty and approved works with level and result.
+// Never points, ranks, files or file paths (CLAUDE.md rule 11).
 export async function GET(_request: Request, ctx: RouteContext<"/api/leaderboard/[studentId]">) {
   const id = z.uuid().safeParse((await ctx.params).studentId);
   if (!id.success) return apiError(404, "not_found");

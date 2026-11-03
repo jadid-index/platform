@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { checkAdminPage } from "@/components/admin-gate";
-import { Card, CardContent, EmptyState, ErrorState, ListSkeleton, SectionHeader } from "@/components/ds";
+import { Card, CardContent, EmptyState, ErrorState, ListSkeleton, SectionHeader, TierBadge } from "@/components/ds";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, formatDate, t } from "@/i18n";
 import { listUsersForAdmin, type AdminUser } from "@/lib/db";
@@ -71,6 +71,7 @@ async function Users({ searchParams }: { searchParams: PageProps<"/admin/users">
                   <TableHead className="pl-4">{t.admin.colName}</TableHead>
                   <TableHead>{t.admin.colUniversity}</TableHead>
                   <TableHead>{t.admin.colStatus}</TableHead>
+                  <TableHead>{t.admin.colPoints}</TableHead>
                   <TableHead>{t.admin.colCreated}</TableHead>
                   <TableHead className="pr-4">
                     {t.admin.colRole} / {t.admin.colStatus}
@@ -93,6 +94,9 @@ async function Users({ searchParams }: { searchParams: PageProps<"/admin/users">
                     </TableCell>
                     <TableCell>
                       <AccountStatusChip status={u.status} />
+                    </TableCell>
+                    <TableCell>
+                      <YearPoints user={u} />
                     </TableCell>
                     <TableCell className="whitespace-nowrap tabular">{formatDate(u.created_at)}</TableCell>
                     <TableCell className="pr-4">
@@ -125,6 +129,7 @@ async function Users({ searchParams }: { searchParams: PageProps<"/admin/users">
                       </div>
                       <AccountStatusChip status={u.status} />
                     </div>
+                    <YearPoints user={u} />
                     <UserControls user={u} />
                   </CardContent>
                 </Card>
@@ -143,5 +148,16 @@ async function Users({ searchParams }: { searchParams: PageProps<"/admin/users">
         shown={rows.length}
       />
     </div>
+  );
+}
+
+// Admins see exact points: a student's points this academic year and the tier they give. Others: nothing.
+function YearPoints({ user }: { user: AdminUser }) {
+  if (user.year_points === null) return <span className="text-muted-foreground">—</span>;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <TierBadge tier={user.tier} size="sm" />
+      <span className="text-small tabular">{format(t.admin.pointsValue, { points: user.year_points })}</span>
+    </span>
   );
 }

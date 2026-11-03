@@ -246,6 +246,21 @@ export type PointsCell = z.infer<typeof pointsBodySchema>["cells"][number];
 
 export const capBodySchema = z.strictObject({ yearly_cap: int.min(1).max(CAP_MAX), reason });
 
+// Tiers: what the public sees instead of points. sort_order is derived from min_points in SQL.
+export const TIER_CODE = /^[A-Za-z0-9+-]{1,8}$/;
+export const TIER_MIN_MAX = 100000;
+export const tierBodySchema = z.strictObject({
+  code: z.string().trim().regex(TIER_CODE),
+  label: z.object({
+    uz: z.string().trim().min(1).max(60),
+    en: z.string().trim().max(60).optional(),
+    ru: z.string().trim().max(60).optional(),
+  }),
+  min_points: int.min(1).max(TIER_MIN_MAX),
+  reason,
+});
+export type TierBody = z.infer<typeof tierBodySchema>;
+
 // Maps exceptions raised by the admin rubric functions to stable API codes and HTTP statuses.
 const RUBRIC_ERRORS: Record<string, [string, number]> = {
   "not an admin": ["forbidden", 403],
@@ -264,6 +279,11 @@ const RUBRIC_ERRORS: Record<string, [string, number]> = {
   "type has submissions": ["type_has_submissions", 409],
   "cell in use": ["cell_in_use", 409],
   "cap below points": ["cap_below_points", 409],
+  "invalid tier code": ["invalid_tier_code", 400],
+  "tier code taken": ["tier_code_taken", 409],
+  "tier min taken": ["tier_min_taken", 409],
+  "tier not found": ["not_found", 404],
+  "last tier": ["last_tier", 409],
 };
 
 export function rubricErrorFromSql(message: string): { code: string; status: number } {

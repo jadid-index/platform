@@ -36,6 +36,8 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    name, university, faculty, score, the number of approved works, and for each approved work its title, type,
    level, result, date and points, plus the profile photo if the student uploaded one. Never the email, course or
    files. Do not add anything else to public views; if you must, change the notice and bump its version first.
+   Since rule 11 the public sees less than the notice allows: the score only as a tier, and no per-work points.
+   (The notice text still mentions points; updating it is an open item for the team.)
    Google sign-in must not import a profile photo (no avatar_url), and the name from Google is only a
    suggestion that the student confirms, because it is shown publicly.
 6. **Pilot sign-up is open: any email address, no email verification** (team decision, 24 Oct, temporary).
@@ -51,8 +53,12 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    Every /admin route and every role-based action is checked on the server.
    Role and status changes go only through `admin_set_role()` / `admin_set_status()` (they protect the last admin
    and write `audit_log`). The first admin is created by SQL (`docs/SPEC.md` section 3a); there is no self-promotion.
-11. **Public views and public APIs never return points or rank numbers; they return tiers (added in Prompt 13).**
-   Exact points go only to the owner, reviewers and admins.
+11. **Public views and public APIs never return points or rank numbers; they return tiers.**
+   Exact points go only to the owner, reviewers and admins. The `tiers` table (code, label, min_points, sort_order;
+   edited on `/admin/rubric`) and `tier_for(points)` decide the tier: a year view uses that year's points, all-time
+   uses the student's best academic year, and no tier ("–") below the lowest threshold. Public order is tier (best
+   first), then name; there is no tie-breaking by approval date and no approval-order data in public responses.
+   `tests/tiers.test.ts` scans every public route's JSON for point, rank and approval-time keys.
 
 ## UI
 
@@ -71,7 +77,10 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 - Every list and screen needs a loading state, an empty state and an error state.
 - Most important screens, in this order: leaderboard, reviewer review screen, add achievement, student dashboard, sign-up.
 - Leaderboard defaults to the current academic year (1 September start), with tabs for earlier years and all-time,
-  and filters for university and faculty. Sort by points, ties broken by the earlier approval date.
+  and filters for university and faculty. It shows tier sections (best first), names in alphabetical order within a
+  tier, a tier badge with the letter always visible, no numbered list and no medals (rule 11).
+  A switch (`?view=list`, defined in `src/lib/leaderboard-view.ts`) shows the same rows in the same order as one flat
+  list with a badge per row. A view changes the layout only, never the data, the order or the cache.
 
 ## Working agreements
 
@@ -110,4 +119,7 @@ do not regenerate or re-run the seed against a live database, and never edit poi
   account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (an admin promotes them on `/admin/users`; the first admin is created by SQL).
+- The consent notice (`t.consent`, `uz-2026-10-25`) still says the score and per-work points are public. The public now
+  sees a tier only; the team should reword the notice (tier instead of points) and bump `CONSENT_VERSION`.
+- Tier thresholds are placeholders (based on 4 categories x 100 = 400 points per year).
 - Employer onboarding and what employers can see (the role exists; no employer screens yet).

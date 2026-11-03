@@ -332,6 +332,9 @@ async function removeTestRubric(prefix?: string): Promise<void> {
       if (stepError) throw stepError;
     }
   }
+  // Test tiers live far above any real score (min 99000+); remove any a failed test left behind.
+  const { error: tierError } = await db.from("tiers").delete().gte("min_points", 99000).like("code", "ZZ%");
+  if (tierError) throw tierError;
   const { error: catError } = await db
     .from("categories")
     .delete()

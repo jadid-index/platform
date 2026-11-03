@@ -78,6 +78,9 @@ async function Queue() {
                     {s.student_name}
                   </Link>
                   {s.faculty ? <div className="text-small text-muted-foreground">{s.faculty}</div> : null}
+                  <div className="text-small text-muted-foreground tabular">
+                    {format(t.review.studentYearPoints, { points: s.student_year_points })}
+                  </div>
                 </TableCell>
                 <TableCell className="max-w-md whitespace-normal">
                   <div className="truncate">{s.title}</div>
@@ -114,6 +117,9 @@ async function Queue() {
                       <span className="text-xs text-muted-foreground">{formatAge(s.submitted_at)}</span>
                     </div>
                     {s.faculty ? <span className="text-small text-muted-foreground">{s.faculty}</span> : null}
+                    <span className="text-small text-muted-foreground tabular">
+                      {format(t.review.studentYearPoints, { points: s.student_year_points })}
+                    </span>
                     <span className="truncate">{s.title}</span>
                     <span className="text-small text-muted-foreground">{typeLine(s)}</span>
                     <FlagChip count={s.flag_count} className="mt-1 w-fit" />

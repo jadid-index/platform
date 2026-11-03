@@ -10,6 +10,7 @@ import { getRubricForAdmin, type AdminRubric } from "@/lib/db";
 
 import { CategoryCaps } from "./category-caps";
 import { PointsEditor } from "./points-editor";
+import { TierEditor } from "./tier-editor";
 import { TypeList } from "./type-list";
 
 export const metadata: Metadata = { title: `${t.admin.rubric.title} · ${t.common.appName}` };
@@ -52,6 +53,10 @@ async function Editor() {
       <section aria-labelledby="rubric-points" className="grid gap-3">
         <SectionHeader id="rubric-points" title={r.pointsTitle} description={r.pointsDescription} />
         <PointsEditor types={rubric.types} cells={rubric.cells} categories={rubric.categories} />
+      </section>
+      <section aria-labelledby="rubric-tiers" className="grid gap-3">
+        <SectionHeader id="rubric-tiers" title={r.tiersTitle} description={r.tiersDescription} />
+        <TierEditor tiers={rubric.tiers} />
       </section>
       <section aria-labelledby="rubric-caps" className="grid gap-3">
         <SectionHeader id="rubric-caps" title={r.categoriesTitle} description={r.categoriesDescription} />
