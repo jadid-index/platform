@@ -21,7 +21,17 @@ import type {
   SubmissionForReview,
   University,
 } from "@/lib/types";
-import { todayInTashkent, type Level, type ProfileBody, type Result } from "@/lib/validation";
+import {
+  adminErrorFromSql,
+  todayInTashkent,
+  type AdminAuditQuery,
+  type AdminUsersQuery,
+  type Level,
+  type ProfileBody,
+  type ProfileStatus,
+  type Result,
+  type Role,
+} from "@/lib/validation";
 
 // The one server-side module that talks to the database and storage. Route handlers and server components
 // call these functions; nothing else imports the admin client.
@@ -51,7 +61,7 @@ export type ProfileSummary = {
   id: string;
   full_name: string;
   course: number | null;
-  role: "student" | "reviewer" | "admin";
+  role: Role;
   university: string;
   faculty: string | null;
 };
@@ -137,7 +147,7 @@ export async function getCountFrom(): Promise<string> {
 
 export async function getProfileAccess(
   userId: string,
-): Promise<{ role: ProfileSummary["role"]; status: "pending" | "active" | "rejected" } | null> {
+): Promise<{ role: Role; status: ProfileStatus } | null> {
   const { data, error } = await getAdminClient()
     .from("profiles")
     .select("role, status")
@@ -896,4 +906,100 @@ export async function createProofReadUrl(path: string, expiresInSeconds: number)
 export async function deleteProof(path: string): Promise<void> {
   const { error } = await getAdminClient().storage.from(PROOFS_BUCKET).remove([path]);
   if (error) console.error("delete proof failed", path, error);
+}
+
+// ------------------------------------------------------------------- admin
+
+// The admin list functions return the full match count on every row (count(*) over ()).
+function withoutTotal<T extends { total_count: number }>(row: T): Omit<T, "total_count"> {
+  const copy: Partial<T> = { ...row };
+  delete copy.total_count;
+  return copy as Omit<T, "total_count">;
+}
+
+export type AdminUser = {
+  id: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  status: ProfileStatus;
+  university: string | null;
+  faculty: string | null;
+  created_at: string;
+};
+
+export async function listUsersForAdmin(query: AdminUsersQuery): Promise<{ rows: AdminUser[]; total: number }> {
+  const { data, error } = await getAdminClient().rpc("admin_list_users", {
+    p_q: query.q ?? null,
+    p_role: query.role ?? null,
+    p_status: query.status ?? null,
+    p_limit: query.limit,
+    p_offset: query.offset,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as (AdminUser & { total_count: number })[];
+  return {
+    rows: rows.map(withoutTotal),
+    total: rows[0] ? Number(rows[0].total_count) : 0,
+  };
+}
+
+export type AdminChange<T> = { ok: true; old: T; new: T; changed: boolean } | { ok: false; code: string; message: string };
+
+// Both run SQL functions that check the actor is an active admin, refuse to leave zero active admins and write
+// the audit_log row in the same transaction. A role change to student without faculty / course / consent
+// fails on the student_fields check (23514).
+async function adminChange<T>(fn: "admin_set_role" | "admin_set_status", args: Record<string, unknown>): Promise<AdminChange<T>> {
+  const { data, error } = await getAdminClient().rpc(fn, args);
+  if (!error) {
+    const result = data as { old: T; new: T; changed: boolean };
+    return { ok: true, old: result.old, new: result.new, changed: result.changed };
+  }
+  if (error.code === "P0001") return { ok: false, code: adminErrorFromSql(error.message), message: error.message };
+  if (error.code === "23514") return { ok: false, code: "student_fields_missing", message: error.message };
+  throw error;
+}
+
+export function setUserRole(actorId: string, targetId: string, role: Role): Promise<AdminChange<Role>> {
+  return adminChange("admin_set_role", { p_actor: actorId, p_target: targetId, p_role: role });
+}
+
+export function setUserStatus(actorId: string, targetId: string, status: "active" | "hidden"): Promise<AdminChange<ProfileStatus>> {
+  return adminChange("admin_set_status", { p_actor: actorId, p_target: targetId, p_status: status });
+}
+
+export type AuditEntry = {
+  id: number;
+  actor_id: string | null;
+  actor_name: string | null;
+  actor_email: string | null;
+  action: string;
+  entity: string;
+  entity_id: string;
+  target_name: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export async function listAuditLog(query: AdminAuditQuery): Promise<{ rows: AuditEntry[]; total: number }> {
+  const { data, error } = await getAdminClient().rpc("admin_list_audit", {
+    p_actor: query.actor ?? null,
+    p_action: query.action ?? null,
+    p_from: query.from ?? null,
+    p_to: query.to ?? null,
+    p_limit: query.limit,
+    p_offset: query.offset,
+  });
+  if (error) throw error;
+  const rows = (data ?? []) as (AuditEntry & { total_count: number })[];
+  return {
+    rows: rows.map(withoutTotal),
+    total: rows[0] ? Number(rows[0].total_count) : 0,
+  };
+}
+
+export async function listAuditActions(): Promise<string[]> {
+  const { data, error } = await getAdminClient().rpc("admin_audit_actions");
+  if (error) throw error;
+  return (data ?? []) as string[];
 }

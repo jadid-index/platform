@@ -18,7 +18,7 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
 
 ## 1. API
 
-All routes return JSON. Auth = Supabase session. `R` = reviewer or admin.
+All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = admin only (role `admin`, status `active`).
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
@@ -36,6 +36,9 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin.
 | POST | `/api/review/submissions/:id/check` | R | Runs the recognition check (section 5), stores `ai_flags`. |
 | POST | `/api/review/submissions/:id/approve` | R | Body `{ type_id, level, result }`. Calls `approve_submission()`. |
 | POST | `/api/review/submissions/:id/reject` | R | Body `{ reason }` (required). Calls `reject_submission()`. |
+| GET | `/api/admin/users` | A | Query: `q` (name or email), `role`, `status`, `limit` (max 200), `offset`. Returns `rows` (id, full_name, email, role, status, university, faculty, created_at) and `total`. `Cache-Control: no-store`. |
+| PATCH | `/api/admin/users/:id` | A | Body `{ role }` or `{ status: "active" \| "hidden" }`, exactly one. Calls `admin_set_role()` / `admin_set_status()`. Returns `{ old, new, changed }`. Errors: 409 `last_admin`, 409 `student_fields_missing`, 404 `not_found`. |
+| GET | `/api/admin/audit` | A | Query: `actor` (name, email or id), `action`, `from`, `to` (YYYY-MM-DD, Tashkent days, inclusive), `limit`, `offset`. Read-only. Returns `rows`, `total`, `actions`. |
 
 The points preview on the review screen is: rubric points for the chosen combination, points the student
 already has in that category and academic year, and points that would be awarded after the cap.
@@ -62,6 +65,47 @@ Known gap: a file uploaded in step 2 with no step 3 stays in the bucket; clean u
 - `approve_submission()` applies the yearly category cap, using the academic year of the achievement date (1 September start), with an advisory lock per student and category. It also blocks self-review and dates before `count_from`.
 - `reject_submission()` requires a non-empty reason.
 - `reviews` is both the points ledger and the audit trail. The leaderboard sums `points_awarded` of approved reviews.
+- `admin_set_role()` and `admin_set_status()` (migration `20261103000001`) check that the actor is an active admin,
+  serialize all admin changes with one advisory lock, refuse a change that would leave no active admin (`last admin`),
+  and write the `audit_log` row in the same transaction. Unchanged values write nothing.
+- `profiles.student_fields`: a student row needs university, faculty, course and consent. Other roles may leave them empty.
+- Every admin SQL function is executable only by `service_role` (the server's secret key).
+
+## 3a. Roles, status and the admin area
+
+- Roles: `student`, `reviewer`, `employer`, `admin`. Onboarding creates students only (employer onboarding comes later).
+  Every other role is set by an admin on `/admin/users`. There is no self-promotion: `admin_set_role()` requires the
+  caller to already be an active admin.
+- Status: `active` or `hidden` (set by an admin). Anything other than `active` removes the person from the leaderboard
+  and public profiles, and takes away reviewer and admin rights. `pending` / `rejected` are legacy values, treated as hidden.
+- Access: `/admin` and `/api/admin` are checked in the proxy (fails closed: lookup error = refused), then again in every page
+  (`checkAdminPage()`) and every route handler (`requireAdmin()`). Visitors are redirected to `/login` (pages) or get 401
+  (API). Signed-in non-admins are redirected to `/dashboard` or get 403.
+- Audit rows for admin changes: `actor_id` = admin, `action` = `profile.role_changed` or `profile.status_changed`,
+  `entity` = `profile`, `entity_id` = the user's id, `details` = `{ "old": ..., "new": ... }`, `created_at` = time.
+- Admins see exact points (for example in audit rows of approvals). Public views must not (CLAUDE.md rule 11).
+
+### First admin (SQL editor, once)
+
+The app cannot create an admin when there is none. Run this in the Supabase SQL editor after the person has signed up:
+
+```sql
+-- 1. They finished onboarding (have a student profile): promote it.
+update profiles set role = 'admin', status = 'active'
+ where id = (select id from auth.users where email = 'person@example.org');
+
+-- 1b. Or they only signed up (no profile yet): create a staff profile without university.
+insert into profiles (id, full_name, role, status)
+select id, 'Full Name', 'admin', 'active' from auth.users where email = 'person@example.org';
+
+-- 2. Record it in the audit log.
+insert into audit_log (actor_id, action, entity, entity_id, details)
+select id, 'profile.role_changed', 'profile', id::text,
+       jsonb_build_object('new', 'admin', 'via', 'sql')
+  from auth.users where email = 'person@example.org';
+```
+
+After that, further admins and reviewers are promoted on `/admin/users`.
 
 ## 4. AI extraction (`POST /api/extract`)
 

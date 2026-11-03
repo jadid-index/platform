@@ -43,3 +43,15 @@ export function formatAge(value: string, now: number = Date.now()): string {
 export function academicYearLabel(year: number): string {
   return `${year}/${String((year + 1) % 100).padStart(2, "0")}`;
 }
+
+// ISO timestamp -> "15.09.2026, 14:05" in Uzbekistan time.
+export function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Asia/Tashkent",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}

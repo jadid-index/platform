@@ -13,7 +13,7 @@ import { createStudentProfile, getMeta, listUniversitiesWithFaculties } from "@/
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createSubmissionFromUpload, issueProofUpload } from "@/lib/submissions";
 import type { Meta } from "@/lib/types";
-import type { Level, Result, SubmissionBody } from "@/lib/validation";
+import type { Level, ProfileStatus, Result, Role, SubmissionBody } from "@/lib/validation";
 
 export const TEST_EMAIL_DOMAIN = "example.invalid";
 const TEST_EMAIL = /^test-[a-z0-9-]+@example\.invalid$/;
@@ -70,18 +70,31 @@ export async function createTestStudent(
   return user;
 }
 
-// Reviewer accounts are created by hand in the database for now (CLAUDE.md open items); this does the same.
-export async function createTestReviewer(local: string, fullName: string): Promise<TestUser> {
+// Staff accounts (reviewer, admin) and employers are created by hand in the database or promoted on /admin;
+// this inserts the profile directly. Employers have no university.
+export async function createTestStaff(
+  local: string,
+  fullName: string,
+  role: Exclude<Role, "student">,
+): Promise<TestUser> {
   const user = await createTestAuthUser(local, { confirmed: true });
-  const { university_id } = await pilotFaculty();
+  const university_id = role === "employer" ? null : (await pilotFaculty()).university_id;
   const { error } = await getAdminClient()
     .from("profiles")
-    .insert({ id: user.id, full_name: `TEST ${fullName}`, university_id, role: "reviewer", status: "active" });
+    .insert({ id: user.id, full_name: `TEST ${fullName}`, university_id, role, status: "active" });
   if (error) throw error;
   return user;
 }
 
-export async function setProfileStatus(userId: string, status: "active" | "pending" | "rejected"): Promise<void> {
+export function createTestReviewer(local: string, fullName: string): Promise<TestUser> {
+  return createTestStaff(local, fullName, "reviewer");
+}
+
+export function createTestAdmin(local: string, fullName: string): Promise<TestUser> {
+  return createTestStaff(local, fullName, "admin");
+}
+
+export async function setProfileStatus(userId: string, status: ProfileStatus): Promise<void> {
   const { error } = await getAdminClient().from("profiles").update({ status }).eq("id", userId);
   if (error) throw error;
 }
@@ -248,6 +261,8 @@ export async function cleanTestData(prefix?: string): Promise<number> {
   const steps = [
     db.from("audit_log").delete().in("actor_id", ids),
     ...(subIds.length ? [db.from("audit_log").delete().in("entity_id", subIds)] : []),
+    // Role and status changes made to test users (also by a real admin while testing by hand).
+    db.from("audit_log").delete().eq("entity", "profile").in("entity_id", ids),
   ];
   for (const step of steps) {
     const { error } = await step;

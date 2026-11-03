@@ -1,10 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { approveSubmission, getPointsPreview, rejectSubmission } from "@/lib/db";
+import { approveSubmission, getPointsPreview, rejectSubmission, setUserStatus } from "@/lib/db";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { reviewErrorFromSql } from "@/lib/validation";
 
 import {
+  createTestAdmin,
   createTestReviewer,
   createTestStudent,
   insertPendingRow,
@@ -83,6 +84,21 @@ describe("approve / reject", () => {
     const sid = await pending(other.id, rows[0], "2025-10-01");
     const byStudent = await rejectSubmission(sid, student.id, "x");
     expect(byStudent.ok || reviewErrorFromSql(byStudent.message).code).toBe("forbidden");
+  });
+
+  it("admins cannot approve their own submissions either, and a hidden reviewer cannot review", async () => {
+    const admin = await createTestAdmin(local("admin"), "Admin");
+    const own = await pending(admin.id, rows[0], "2025-10-01");
+    const self = await approveSubmission(own, admin.id, rows[0].type_id, rows[0].level, rows[0].result);
+    expect(self.ok || reviewErrorFromSql(self.message).code).toBe("self_review");
+
+    const hidden = await createTestReviewer(local("hidden"), "Hidden");
+    expect(await setUserStatus(admin.id, hidden.id, "hidden")).toMatchObject({ ok: true, changed: true });
+    const student = await createTestStudent(local("h"), "H");
+    const id = await pending(student.id, rows[0], "2025-10-01");
+    const res = await approveSubmission(id, hidden.id, rows[0].type_id, rows[0].level, rows[0].result);
+    expect(res.ok || reviewErrorFromSql(res.message).code).toBe("forbidden");
+    expect(await statusOf(id)).toBe("pending");
   });
 });
 

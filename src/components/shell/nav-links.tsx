@@ -31,6 +31,7 @@ export async function NavLinks() {
   const isStudent = viewer.kind === "member" && viewer.active && viewer.role === "student";
   const isReviewer =
     viewer.kind === "member" && viewer.active && (viewer.role === "reviewer" || viewer.role === "admin");
+  const isAdmin = viewer.kind === "member" && viewer.active && viewer.role === "admin";
 
   return (
     <>
@@ -52,6 +53,12 @@ export async function NavLinks() {
       {isReviewer ? (
         <Group title={t.nav.groupReviewer}>
           <NavItem href="/review" label={t.nav.reviewQueue} icon="review" />
+        </Group>
+      ) : null}
+      {isAdmin ? (
+        <Group title={t.nav.groupAdmin}>
+          <NavItem href="/admin/users" label={t.nav.adminUsers} icon="users" />
+          <NavItem href="/admin/audit" label={t.nav.adminAudit} icon="audit" />
         </Group>
       ) : null}
     </>

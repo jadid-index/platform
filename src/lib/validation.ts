@@ -142,3 +142,60 @@ export const leaderboardQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
+
+// -------------------------------------------------------------------- admin
+
+export const ROLES = ["student", "reviewer", "employer", "admin"] as const;
+export type Role = (typeof ROLES)[number];
+// Every value of profile_status. Only "active" is public; admins set "active" or "hidden".
+export const PROFILE_STATUSES = ["active", "hidden", "pending", "rejected"] as const;
+export type ProfileStatus = (typeof PROFILE_STATUSES)[number];
+export const ADMIN_SETTABLE_STATUSES = ["active", "hidden"] as const;
+
+const optionalQueryText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((v) => (v ? v : undefined));
+
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((d) => !Number.isNaN(Date.parse(d)));
+
+export const adminUsersQuerySchema = z.object({
+  q: optionalQueryText(120),
+  role: z.enum(ROLES).optional(),
+  status: z.enum(PROFILE_STATUSES).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+// Optional keys stay optional for callers that build a query by hand (tests, scripts).
+export type AdminUsersQuery = Partial<z.infer<typeof adminUsersQuerySchema>> & { limit: number; offset: number };
+
+// Exactly one change per request, so each change gets its own audit row.
+export const adminUserPatchSchema = z.union([
+  z.strictObject({ role: z.enum(ROLES) }),
+  z.strictObject({ status: z.enum(ADMIN_SETTABLE_STATUSES) }),
+]);
+export type AdminUserPatch = z.infer<typeof adminUserPatchSchema>;
+
+export const adminAuditQuerySchema = z.object({
+  actor: optionalQueryText(120),
+  action: optionalQueryText(80),
+  from: isoDay.optional(),
+  to: isoDay.optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+export type AdminAuditQuery = Partial<z.infer<typeof adminAuditQuerySchema>> & { limit: number; offset: number };
+
+// Maps exceptions raised by admin_set_role() / admin_set_status() to stable API codes.
+export function adminErrorFromSql(message: string): string {
+  const known: Record<string, string> = {
+    "not an admin": "forbidden",
+    "user not found": "not_found",
+    "last admin": "last_admin",
+    "invalid status": "invalid_body",
+  };
+  return known[message] ?? "sql_error";
+}

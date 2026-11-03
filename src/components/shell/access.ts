@@ -4,11 +4,12 @@ import { cache } from "react";
 
 import { getCurrentUser } from "@/lib/auth";
 import { getProfileAccess, getProfileSummary } from "@/lib/db";
+import type { Role } from "@/lib/validation";
 
 export type ShellViewer =
   | { kind: "guest" }
   | { kind: "no-profile" }
-  | { kind: "member"; name: string; role: "student" | "reviewer" | "admin"; active: boolean };
+  | { kind: "member"; name: string; role: Role; active: boolean };
 
 // Who is looking at the page, for the navigation only. Pages and API routes check access themselves.
 // cache(): the sidebar, the mobile drawer and the account menu share one lookup per request.

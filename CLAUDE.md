@@ -36,11 +36,17 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
    Identity verification (university email, HEMIS / student ID login) comes after the pilot. Keep `profiles.status`,
    `allowed_email_domains` and the student-review idea in the schema, but do not enforce them now, and do not
    build features that assume emails are real or deliverable (no email notifications; password reset by email
-   works only if SMTP is configured). A profile with status other than 'active' is hidden from the leaderboard;
-   that is the manual kill switch for fake accounts.
+   works only if SMTP is configured). A profile with status other than 'active' is hidden from the leaderboard and
+   public profiles; that is the kill switch for fake accounts. Admins set status 'hidden' on `/admin/users`.
 7. **A rejection needs a reason.** Reviewers cannot review their own submissions.
 8. **Never commit secrets.** `.env*` stays in `.gitignore`; keep `.env.example` with variable names only.
 9. **Never send student profile data to the AI model.** `/api/extract` sends the document and the prompt only.
+10. **Roles are student, reviewer, employer, admin.** A role is only ever set by an admin or by onboarding (student or employer only).
+   Every /admin route and every role-based action is checked on the server.
+   Role and status changes go only through `admin_set_role()` / `admin_set_status()` (they protect the last admin
+   and write `audit_log`). The first admin is created by SQL (`docs/SPEC.md` section 3a); there is no self-promotion.
+11. **Public views and public APIs never return points or rank numbers; they return tiers (added in Prompt 13).**
+   Exact points go only to the owner, reviewers and admins.
 
 ## UI
 
@@ -68,7 +74,7 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
   editing an applied one.
 - Validate every request body on the server (zod), whatever the form already checks.
 - Keep scope tight. For Thursday, cut these first: photo and bio, appeal comment, extra recognition checks.
-  Do not build: blockchain, plagiarism detection, quality scoring, admin screens, notifications.
+  Do not build: blockchain, plagiarism detection, quality scoring, notifications.
 - Commit small and often. Open pull requests against `main`; during the Thursday sprint pushing directly is fine.
 
 ## Portability (so a move to local hosting stays cheap)
@@ -97,4 +103,5 @@ The rubric lives in `docs/jadid_index_rubric_v0.3.xlsx`; `seed.sql` is generated
 - Abandoned uploads: a proof uploaded without step 3 stays in the bucket. Limits cap it at about 300 MB per
   account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
-- The list of first reviewers (accounts are created by hand in the database for now).
+- The list of first reviewers (an admin promotes them on `/admin/users`; the first admin is created by SQL).
+- Employer onboarding and what employers can see (the role exists; no employer screens yet).

@@ -1,4 +1,3 @@
-import { createServerClient } from "@supabase/ssr";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -10,26 +9,13 @@ import {
   type TestUser,
 } from "../../scripts/lib/test-data";
 import { testRun } from "../helpers";
+import { sessionCookie } from "./session";
 
 // Runs against a live app (next start), because the leaderboard cache only exists inside Next:
 //   E2E_BASE_URL=http://localhost:3000 npm run test:e2e
 const BASE = process.env.E2E_BASE_URL;
 const local = testRun("e2e");
 const YEAR = 2023;
-
-// Signs in with the publishable key, as the browser would, and returns the auth cookies @supabase/ssr sets.
-async function sessionCookie(user: TestUser): Promise<string> {
-  const jar = new Map<string, string>();
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
-    cookies: {
-      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
-      setAll: (cookies) => cookies.forEach(({ name, value }) => (value ? jar.set(name, value) : jar.delete(name))),
-    },
-  });
-  const { error } = await supabase.auth.signInWithPassword({ email: user.email, password: user.password });
-  if (error) throw error;
-  return [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
-}
 
 async function boardHas(studentId: string): Promise<number | null> {
   const res = await fetch(`${BASE}/api/leaderboard?academic_year=${YEAR}&limit=200`);

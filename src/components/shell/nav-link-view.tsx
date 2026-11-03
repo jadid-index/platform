@@ -1,4 +1,14 @@
-import { Award, ClipboardCheck, House, PlusCircle, Trophy, UserRoundCheck, type LucideIcon } from "lucide-react";
+import {
+  Award,
+  ClipboardCheck,
+  House,
+  PlusCircle,
+  ScrollText,
+  Trophy,
+  UserRoundCheck,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
@@ -10,6 +20,8 @@ const ICONS = {
   add: PlusCircle,
   review: ClipboardCheck,
   onboarding: UserRoundCheck,
+  users: UsersRound,
+  audit: ScrollText,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIcon = keyof typeof ICONS;

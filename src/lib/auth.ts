@@ -40,3 +40,16 @@ export async function requireReviewer(): Promise<
   }
   return { ok: true, userId: user.id };
 }
+
+// For /admin pages and /api/admin route handlers: role admin and an active profile.
+export async function requireAdmin(): Promise<
+  { ok: true; userId: string } | { ok: false; status: 401 | 403; error: string }
+> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, status: 401, error: "unauthorized" };
+  const access = await getProfileAccess(user.id);
+  if (!access || access.status !== "active" || access.role !== "admin") {
+    return { ok: false, status: 403, error: "forbidden" };
+  }
+  return { ok: true, userId: user.id };
+}
