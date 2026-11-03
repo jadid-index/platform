@@ -23,6 +23,7 @@ import { recognitionChecks, type Check } from "@/lib/recognition";
 import type { Meta, PointsPreview, SubmissionForReview } from "@/lib/types";
 
 import { ReviewPanel } from "./review-panel";
+import { SensitiveFlag } from "./sensitive-flag";
 
 export const metadata: Metadata = { title: `${t.review.title} · ${t.common.appName}` };
 
@@ -117,6 +118,8 @@ async function ReviewLoader({ params }: { params: PageProps<"/review/[id]">["par
             <AlertDescription>{t.review.selfReview}</AlertDescription>
           </Alert>
         ) : null}
+        {/* Next to the decision, not under the sticky file viewer, which can be taller than the screen. */}
+        <SensitiveFlag submissionId={submission.id} initial={submission.sensitive_data_flag} disabled={isOwn} />
         <ReviewPanel
           submissionId={submission.id}
           // The reviewer may correct to an active type, or keep the submitted one even if it was deactivated since.

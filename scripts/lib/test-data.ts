@@ -9,7 +9,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { CONSENT_VERSION } from "@/lib/consent";
-import { createStudentProfile, getMeta, listUniversitiesWithFaculties } from "@/lib/db";
+import { createStudentProfile, getMeta, listUniversitiesWithFaculties, proofPath } from "@/lib/db";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createSubmissionFromUpload, issueProofUpload } from "@/lib/submissions";
 import type { Meta, TypeName } from "@/lib/types";
@@ -94,6 +94,16 @@ export function createTestAdmin(local: string, fullName: string): Promise<TestUs
   return createTestStaff(local, fullName, "admin");
 }
 
+// An employer with an employer_profiles row (verified or not). Verification has no UI yet; admins set it later.
+export async function createTestEmployer(local: string, fullName: string, verified: boolean): Promise<TestUser> {
+  const user = await createTestStaff(local, fullName, "employer");
+  const { error } = await getAdminClient()
+    .from("employer_profiles")
+    .insert({ profile_id: user.id, verified, verified_at: verified ? new Date().toISOString() : null });
+  if (error) throw error;
+  return user;
+}
+
 export async function setProfileStatus(userId: string, status: ProfileStatus): Promise<void> {
   const { error } = await getAdminClient().from("profiles").update({ status }).eq("id", userId);
   if (error) throw error;
@@ -158,7 +168,7 @@ export async function submitThroughApiPath(
     content_type: file.contentType,
   });
   if (!issued.ok) return { issued, created: null, path: null };
-  const path = `${studentId}/${issued.submission_id}/${issued.file_name}`;
+  const path = proofPath(issued.submission_id, issued.file_name);
   await uploadProofBytes(path, file.bytes, file.contentType);
   const created = await createSubmissionFromUpload(studentId, {
     ...fields,
@@ -196,7 +206,7 @@ export async function insertPendingRow(
       ...row,
       title: row.title ?? "[TEST] Toʻgʻridan-toʻgʻri qator",
       issuer: "TEST tashkilot",
-      file_path: `${studentId}/${id}/none.pdf`,
+      file_path: `${id}/document.pdf`,
       file_sha256: createHash("sha256").update(id).digest("hex"),
       status: "pending",
     });
@@ -266,21 +276,39 @@ async function removeTestUsers(prefix?: string): Promise<number> {
   if (users.length === 0) return 0;
   const ids = users.map((u) => u.id);
 
-  for (const id of ids) {
-    const { data: folders } = await db.storage.from("proofs").list(id, { limit: 1000 });
-    const paths: string[] = [];
-    for (const folder of folders ?? []) {
-      const { data: files } = await db.storage.from("proofs").list(`${id}/${folder.name}`, { limit: 100 });
-      for (const f of files ?? []) paths.push(`${id}/${folder.name}/${f.name}`);
-    }
-    if (paths.length) await db.storage.from("proofs").remove(paths);
-  }
-
   const { data: subs, error: subsError } = await db.from("submissions").select("id").in("student_id", ids);
   if (subsError) throw subsError;
   const subIds = (subs ?? []).map((s) => s.id as string);
 
+  // Files live under {submission_id}/ (neutral names). Uploads that never became a submission are found through
+  // their upload-url audit rows. Older test files used {student_id}/{submission_id}/ folders.
+  const { data: issued, error: issuedError } = await db
+    .from("audit_log")
+    .select("entity_id")
+    .eq("action", "proof.upload_url")
+    .in("actor_id", ids);
+  if (issuedError) throw issuedError;
+  const folders = new Set([...subIds, ...(issued ?? []).map((r) => r.entity_id as string)]);
+  const paths: string[] = [];
+  for (const folder of folders) {
+    const { data: files } = await db.storage.from("proofs").list(folder, { limit: 100 });
+    for (const f of files ?? []) paths.push(`${folder}/${f.name}`);
+  }
+  for (const id of ids) {
+    const { data: old } = await db.storage.from("proofs").list(id, { limit: 1000 });
+    for (const folder of old ?? []) {
+      const { data: files } = await db.storage.from("proofs").list(`${id}/${folder.name}`, { limit: 100 });
+      for (const f of files ?? []) paths.push(`${id}/${folder.name}/${f.name}`);
+    }
+  }
+  for (let i = 0; i < paths.length; i += 500) await db.storage.from("proofs").remove(paths.slice(i, i + 500));
+
   const steps = [
+    db.from("file_access_log").delete().in("viewer_id", ids),
+    // Route scans call /api/files with user ids as the submission id.
+    db.from("file_access_log").delete().in("submission_id", ids),
+    ...(subIds.length ? [db.from("file_access_log").delete().in("submission_id", subIds)] : []),
+    db.from("employer_profiles").delete().in("verified_by", ids),
     db.from("audit_log").delete().in("actor_id", ids),
     ...(subIds.length ? [db.from("audit_log").delete().in("entity_id", subIds)] : []),
     // Role and status changes made to test users (also by a real admin while testing by hand).

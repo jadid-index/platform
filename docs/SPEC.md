@@ -30,13 +30,16 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = 
 | POST | `/api/submissions` | student | Create a submission (section 2). |
 | GET | `/api/submissions` | student | Own submissions with status and rejection reason. |
 | POST | `/api/submissions/:id/withdraw` | student | Only while `pending`. Frees the file hash. |
+| PATCH | `/api/submissions/:id/visibility` | student (owner) | Body `{ visibility: "private" \| "verified" \| "public", confirm? }`. `public` needs `confirm: true` (the dialog checkbox). Calls `set_file_visibility()`. Errors: 400 `confirmation_required`, 404 `not_found`, 409 `not_approved`, 409 `sensitive_locked`. |
+| GET | `/api/files/:submissionId` | see section 3d | 302 to a signed URL valid 60 s. Approved only. 404 when not found, not approved or (signed out) not allowed; 403 for signed-in viewers not allowed; 429 `rate_limited`. Always `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store`. Never the storage path in the body. |
 | GET | `/api/leaderboard` | public | Query: `university_id, faculty_id, academic_year, limit, offset`. Default is the current academic year (`leaderboard_by_year`); pass `academic_year=all` for the all-time view `leaderboard`. The response includes `available_years` for the year tabs. Rows: `student_id, full_name, university, faculty, photo_url, approved_count, tier {code, label, sort_order} \| null`, ordered by tier (best first) then name. No points, rank or approval time. |
-| GET | `/api/leaderboard/:studentId` | public | Name, faculty, `tier` (best academic year), `current_year.tier`, `approved_count`, and approved works (title, type, level, result, date). No points, never the file. |
+| GET | `/api/leaderboard/:studentId` | public | Name, faculty, `tier` (best academic year), `current_year.tier`, `approved_count`, and approved works (`submission_id`, title, type, issuer, level, result, date, `certificate_ref`, `file_public`). No points, never a file path or URL. |
 | GET | `/api/review/queue` | R | Pending submissions, oldest first. |
 | GET | `/api/review/submissions/:id` | R | Submission, signed file URL, `ai_flags`, and the points preview. |
 | POST | `/api/review/submissions/:id/check` | R | Runs the recognition check (section 5), stores `ai_flags`. |
 | POST | `/api/review/submissions/:id/approve` | R | Body `{ type_id, level, result }`. Calls `approve_submission()`. |
 | POST | `/api/review/submissions/:id/reject` | R | Body `{ reason }` (required). Calls `reject_submission()`. |
+| PATCH | `/api/review/submissions/:id/sensitive` | R | Body `{ flag }`. Calls `set_sensitive_flag()`; flagging makes the file private for good. Not on own submissions (403 `own_submission`). |
 | GET | `/api/admin/users` | A | Query: `q` (name or email), `role`, `status`, `limit` (max 200), `offset`. Returns `rows` (id, full_name, email, role, status, university, faculty, created_at) and `total`. `Cache-Control: no-store`. |
 | PATCH | `/api/admin/users/:id` | A | Body `{ role }` or `{ status: "active" \| "hidden" }`, exactly one. Calls `admin_set_role()` / `admin_set_status()`. Returns `{ old, new, changed }`. Errors: 409 `last_admin`, 409 `student_fields_missing`, 404 `not_found`. |
 | GET | `/api/admin/audit` | A | Query: `actor` (name, email or id), `action`, `from`, `to` (YYYY-MM-DD, Tashkent days, inclusive), `limit`, `offset`. Read-only. Returns `rows`, `total`, `actions`. |
@@ -155,6 +158,32 @@ After that, further admins and reviewers are promoted on `/admin/users`.
   Only students with at least one approved work in the period are listed; hidden profiles never.
 - Landing page: "Top tier students" shows the best non-empty tier of the default view, first names alphabetically.
 - Profile page: the all-time tier as the headline badge, plus the current academic year's tier.
+
+## 3d. File visibility (migration `20261106000000`)
+
+- Files stay in the private `proofs` bucket under neutral names: `{submission_id}/document.{ext}`. The signed URL
+  reveals only that; never the student id or the original file name.
+- `submissions.file_visibility` (`private` / `verified` / `public`, default `verified`), `sensitive_data_flag`
+  (reviewers), `public_confirmed_at` (set when the owner confirms public). Constraints: public needs the confirmation;
+  a flagged file is always private.
+- `employer_profiles (profile_id, verified, verified_at, verified_by)`: nobody is verified yet; no admin UI yet.
+- `file_access_log (submission_id, viewer_id, client_key, created_at)`: the rate limit for `/api/files`
+  (30 requests per 10 minutes per user, or per HMAC of the IP when signed out). Rows older than a day are deleted.
+- Who may open an approved work's file (`canViewFile()` in `src/lib/file-access.ts`):
+
+| Viewer | private | verified | public | flagged (any) |
+|---|---|---|---|---|
+| owner, reviewer, admin | yes | yes | yes | yes |
+| verified employer | no | yes | yes | no |
+| anyone else, signed out too | no | no | yes | no |
+
+- Pending, rejected and withdrawn submissions never return a file, for anyone.
+- Dashboard: per approved work a radio group with plain explanations; public opens a dialog with a preview and a
+  required checkbox. Review screen: the sensitive-data checkbox (saved at once).
+- Public work page `/works/:submissionId`: title, type, issuer, date, level, result, certificate reference and a
+  verified badge, always; "View document" only for viewers `canViewFile()` allows. The profile links each work to it.
+- Consent v2 (`CONSENT_VERSION = "v2"`, Uzbek and Russian, `docs/consent-v2.md`) describes this; `/privacy` has the
+  policy. Both are drafts until the team's text arrives.
 
 ## 4. AI extraction (`POST /api/extract`)
 

@@ -25,7 +25,6 @@ import { getPublicCounts, getPublicTiersCached, getTopTierStudents, type PublicC
 import type { PublicTier, TopTier } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const CONTACT_EMAIL = "fazlddn4@gmail.com";
 const TOP_COUNT = 5;
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -117,18 +116,6 @@ export default function HomePage() {
         </Suspense>
       </section>
 
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-6 text-small text-muted-foreground">
-        <span>© {t.common.appName}</span>
-        <span>
-          {t.home.footerContact}{" "}
-          <a
-            href={`mailto:${CONTACT_EMAIL}`}
-            className="font-medium text-primary-strong underline-offset-4 hover:underline"
-          >
-            {CONTACT_EMAIL}
-          </a>
-        </span>
-      </footer>
     </div>
   );
 }

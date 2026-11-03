@@ -1,4 +1,6 @@
 // Version of the consent notice the student agrees to. It is stored in profiles.consent_version.
-// The Uzbek text is t.consent in src/i18n/uz.ts (approved 25 Oct). Bump this whenever the text changes;
-// /api/profile accepts only the current version. The Russian text is still to come.
-export const CONSENT_VERSION = "uz-2026-10-25";
+// v2 (6 Nov): file visibility, issuer and certificate reference public, tiers instead of points, hashed IP log.
+// The text is t.consent in src/i18n/uz.ts and src/i18n/ru.ts. It is still a DRAFT (t.consent.draft): the team's
+// final text from docs/consent-v2.md replaces it. Bump this whenever the text changes; /api/profile accepts only
+// the current version. Existing accounts are not asked to consent again.
+export const CONSENT_VERSION = "v2";

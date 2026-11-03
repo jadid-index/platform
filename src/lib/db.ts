@@ -15,6 +15,9 @@ import type {
   PointsPreview,
   PublicStudent,
   PublicWork,
+  PublicWorkPage,
+  FileVisibility,
+  SubmissionStatus,
   RejectedSubmission,
   ReviewQueueItem,
   RubricRow,
@@ -387,7 +390,7 @@ export async function listOwnSubmissions(studentId: string): Promise<OwnSubmissi
     db
       .from("submissions")
       .select(
-        "id, title, type_id, level, result, achievement_date, status, submitted_at, reviews(points_awarded, rejection_reason)",
+        "id, title, type_id, level, result, achievement_date, status, submitted_at, file_visibility, sensitive_data_flag, reviews(points_awarded, rejection_reason)",
       )
       .eq("student_id", studentId)
       .order("submitted_at", { ascending: false }),
@@ -415,6 +418,8 @@ export async function listOwnSubmissions(studentId: string): Promise<OwnSubmissi
       submitted_at: s.submitted_at,
       points_awarded: review?.points_awarded ?? null,
       rejection_reason: review?.rejection_reason ?? null,
+      file_visibility: s.file_visibility,
+      sensitive_data_flag: s.sensitive_data_flag,
     };
   });
 }
@@ -574,7 +579,7 @@ export async function getSubmissionForReview(submissionId: string): Promise<Subm
   const { data, error } = await getAdminClient()
     .from("submissions")
     .select(
-      "id, status, type_id, level, result, title, issuer, achievement_date, certificate_ref, note, student_comment, parent_id, submitted_at, file_path, ai_extraction, profiles(id, full_name, course, faculties(name))",
+      "id, status, type_id, level, result, title, issuer, achievement_date, certificate_ref, note, student_comment, parent_id, submitted_at, file_path, sensitive_data_flag, ai_extraction, profiles(id, full_name, course, faculties(name))",
     )
     .eq("id", submissionId)
     .maybeSingle();
@@ -833,7 +838,7 @@ export async function getPublicStudent(studentId: string): Promise<PublicStudent
       .maybeSingle(),
     db
       .from("public_works")
-      .select("title, type_id, type_name, level, result, achievement_date")
+      .select(PUBLIC_WORK_COLUMNS)
       .eq("student_id", studentId)
       .order("achievement_date", { ascending: false }),
   ]);
@@ -857,6 +862,38 @@ export async function getPublicStudent(studentId: string): Promise<PublicStudent
     },
     works: (works.data ?? []) as PublicWork[],
   };
+}
+
+// Public work fields (the public_works view never has the file path, raw visibility or the sensitive flag).
+const PUBLIC_WORK_COLUMNS =
+  "submission_id, title, type_id, type_name, level, result, achievement_date, issuer, certificate_ref, file_public";
+
+// One approved work of an active student, for /works/[id]. null when the work or its student is not public.
+export async function getPublicWork(submissionId: string): Promise<PublicWorkPage | null> {
+  "use cache: remote";
+  cacheTag(LEADERBOARD_TAG);
+  cacheLife(LEADERBOARD_CACHE);
+
+  const db = getAdminClient();
+  const work = await db
+    .from("public_works")
+    .select(`student_id, ${PUBLIC_WORK_COLUMNS}`)
+    .eq("submission_id", submissionId)
+    .maybeSingle();
+  if (work.error) throw work.error;
+  if (!work.data) return null;
+  const { student_id, ...rest } = work.data as PublicWork & { student_id: string };
+
+  // The leaderboard view holds only active students with approved work (hidden profiles drop out here).
+  const student = await db
+    .from("leaderboard")
+    .select("student_id, full_name, university, faculty")
+    .eq("student_id", student_id)
+    .maybeSingle();
+  if (student.error) throw student.error;
+  if (!student.data) return null;
+  const s = student.data as { full_name: string; university: string; faculty: string | null };
+  return { ...rest, student_id, full_name: s.full_name, university: s.university, faculty: s.faculty };
 }
 
 export async function getLatestWorkDates(studentIds: string[], year: LeaderboardYear): Promise<Record<string, string>> {
@@ -984,12 +1021,103 @@ export async function getYearPoints(studentId: string, academicYear: number): Pr
   return sumApprovedPoints(studentId, academicYear);
 }
 
+// ------------------------------------------------------------- file access
+
+export type FileAccessRow = {
+  id: string;
+  student_id: string;
+  status: SubmissionStatus;
+  file_path: string;
+  file_visibility: FileVisibility;
+  sensitive_data_flag: boolean;
+};
+
+// Server only: carries the storage path. GET /api/files uses it and never returns the path.
+export async function getFileAccess(submissionId: string): Promise<FileAccessRow | null> {
+  const { data, error } = await getAdminClient()
+    .from("submissions")
+    .select("id, student_id, status, file_path, file_visibility, sensitive_data_flag")
+    .eq("id", submissionId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as FileAccessRow | null;
+}
+
+export async function isVerifiedEmployer(profileId: string): Promise<boolean> {
+  const { data, error } = await getAdminClient()
+    .from("employer_profiles")
+    .select("verified")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.verified === true;
+}
+
+export async function countFileAccessSince(clientKey: string, sinceIso: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("file_access_log")
+    .select("id", { count: "exact", head: true })
+    .eq("client_key", clientKey)
+    .gte("created_at", sinceIso);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+// One row per request; rows older than a day are removed on the way (the log only serves the rate limit).
+export async function logFileAccess(
+  entry: { submission_id: string; viewer_id: string | null; client_key: string },
+  now: Date = new Date(),
+): Promise<void> {
+  const db = getAdminClient();
+  const { error } = await db.from("file_access_log").insert(entry);
+  if (error) throw error;
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const { error: pruneError } = await db.from("file_access_log").delete().lt("created_at", dayAgo);
+  if (pruneError) throw pruneError;
+}
+
+export type VisibilityOutcome = { ok: true } | { ok: false; message: string };
+
+// Owner only, approved work only, never while flagged; 'public' needs the confirmation (set_file_visibility()).
+export async function setFileVisibility(
+  studentId: string,
+  submissionId: string,
+  visibility: FileVisibility,
+  confirm: boolean,
+): Promise<VisibilityOutcome> {
+  const { error } = await getAdminClient().rpc("set_file_visibility", {
+    p_student: studentId,
+    p_submission: submissionId,
+    p_visibility: visibility,
+    p_confirm: confirm,
+  });
+  if (!error) return { ok: true };
+  if (error.code === "P0001") return { ok: false, message: error.message };
+  throw error;
+}
+
+// Reviewers and admins, never on their own submission; flagging makes the file private (set_sensitive_flag()).
+export async function setSensitiveFlag(reviewerId: string, submissionId: string, flag: boolean): Promise<VisibilityOutcome> {
+  const { error } = await getAdminClient().rpc("set_sensitive_flag", {
+    p_reviewer: reviewerId,
+    p_submission: submissionId,
+    p_flag: flag,
+  });
+  if (!error) return { ok: true };
+  if (error.code === "P0001") return { ok: false, message: error.message };
+  throw error;
+}
+
 // ---------------------------------------------------------------- storage
 
 const PROOFS_BUCKET = "proofs";
 
-export function proofPath(studentId: string, submissionId: string, fileName: string): string {
-  return `${studentId}/${submissionId}/${fileName}`;
+// Neutral object names: {submission_id}/document.{ext}. The signed URL that GET /api/files hands out contains this
+// path, so it must never carry the student id or the original file name (which can hold a name or an ID number).
+export function proofPath(submissionId: string, fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  const ext = dot > 0 ? fileName.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+  return `${submissionId}/document${ext ? `.${ext}` : ""}`;
 }
 
 // One-time URL the browser uses to upload the proof straight to the private bucket. Large files would

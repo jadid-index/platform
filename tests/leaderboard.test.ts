@@ -83,7 +83,7 @@ describe("leaderboard", () => {
     expect(Object.keys(profile).sort()).toEqual(
       ["approved_count", "current_year", "faculty", "full_name", "photo_url", "student_id", "tier", "university", "works"].sort(),
     );
-    expect(Object.keys(profile.works[0]).sort()).toEqual(["achievement_date", "level", "result", "title", "type_id", "type_name"].sort());
+    expect(Object.keys(profile.works[0]).sort()).toEqual(["achievement_date", "certificate_ref", "file_public", "issuer", "level", "result", "submission_id", "title", "type_id", "type_name"].sort());
     const json = JSON.stringify(profile);
     // Keys only ("course" also appears in type names such as "Professional course certificate").
     expect(json).not.toMatch(/@example\.invalid|"file_path"|"file_sha256"|"course"|"telegram"|"bio"|"consent_\w+"|"email"|"points|"rank"/);

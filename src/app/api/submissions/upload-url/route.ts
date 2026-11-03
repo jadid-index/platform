@@ -6,7 +6,7 @@ import { issueProofUpload } from "@/lib/submissions";
 import { uploadUrlBodySchema } from "@/lib/validation";
 
 // Step 1 of adding an achievement: reserve a submission id and return a one-time upload URL for
-// proofs/{student_id}/{submission_id}/{file_name} plus a short-lived upload ticket. Limits and checks live in
+// proofs/{submission_id}/document.{ext} plus a short-lived upload ticket. Limits and checks live in
 // issueProofUpload(); the file is checked and hashed in POST /api/submissions.
 export async function POST(request: Request) {
   const parsed = uploadUrlBodySchema.safeParse(await readJson(request));

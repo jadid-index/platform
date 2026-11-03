@@ -94,6 +94,7 @@ export const uz = {
     ctaTextMember: "Yangi yutugʻingizni yuklang va darajangizni kuzating.",
     addAchievement: "Yutuq qoʻshish",
     footerContact: "Savol va takliflar uchun:",
+    footerPrivacy: "Maxfiylik siyosati",
   },
   tiers: {
     badge: "Daraja: {tier}",
@@ -167,17 +168,67 @@ export const uz = {
     optionsError: "Universitetlar roʻyxatini yuklab boʻlmadi.",
     noUniversities: "Hozircha universitetlar qoʻshilmagan.",
   },
+  // Consent notice v2 (CONSENT_VERSION in src/lib/consent.ts). DRAFT: the team's final text replaces it
+  // (docs/consent-v2.md). The Russian text is in src/i18n/ru.ts. Bump the version whenever this text changes.
   consent: {
+    draft: true,
+    draftLabel: "Qoralama matn: jamoa yakuniy matn bilan almashtiradi.",
     title: "Jadid Index-dagi maʼlumotlaringiz",
-    // Version: CONSENT_VERSION in src/lib/consent.ts. Bump it whenever this text changes.
     text: [
-      "Profilingizni yaratish va yutuqlaringizni baholash (reytinglash) uchun biz sizning toʻliq ism-sharifingiz, e-pochta manzilingiz, oʻqiyotgan universitetingiz, fakultetingiz, kursingiz hamda yuklagan hujjatlaringizni (sertifikatlar, ilmiy ishlar va shu kabilar) toʻplaymiz. Google orqali kirsangiz, Googledagi ismingiz faqat taklif sifatida koʻrsatiladi va uni oʻzingiz tasdiqlaysiz; Google profil rasmingiz ishlatilmaydi va koʻrsatilmaydi.",
-      "Hujjatlaringizni faqat platforma tekshiruvchilari koʻra oladi. Reyting jadvalida va ochiq profilingizda quyidagilar hammaga koʻrinadi: ism-sharifingiz, universitetingiz, fakultetingiz, toʻplagan ballingiz, tasdiqlangan yutuqlaringiz soni hamda har bir tasdiqlangan yutuqning nomi, turi, darajasi, natijasi, sanasi va bali, shuningdek profil rasmingiz (agar oʻzingiz yuklasangiz). E-pochta manzilingiz, kursingiz va yuklagan fayllaringiz ommaga oshkor qilinmaydi.",
-      "Maʼlumotlaringiz Oʻzbekistondan tashqarida joylashgan serverlarda saqlanadi. Formalarni avtomatik toʻldirish maqsadida yuklangan sertifikatlar matnni avtomatik aniqlash xizmati orqali qayta ishlanishi mumkin; bu xizmatga faqat hujjatning oʻzi yuboriladi, profil maʼlumotlaringiz yuborilmaydi. Ushbu jarayon ham Oʻzbekistondan tashqaridagi serverlarda amalga oshirilishi mumkin.",
-      "Istalgan vaqtda fazlddn4@gmail.com manziliga yozish orqali hisobingiz va hujjatlaringizni oʻchirishni soʻrashingiz mumkin.",
+      "Profilingizni yaratish va yutuqlaringizni baholash uchun biz toʻliq ism-sharifingiz, e-pochta manzilingiz, universitetingiz, fakultetingiz, kursingiz hamda yuklagan hujjatlaringizni (sertifikatlar, ilmiy ishlar va shu kabilar) toʻplaymiz. Google orqali kirsangiz, Googledagi ismingiz faqat taklif sifatida koʻrsatiladi va uni oʻzingiz tasdiqlaysiz; Google profil rasmingiz ishlatilmaydi.",
+      "Reyting jadvalida va ochiq profilingizda hammaga koʻrinadi: ism-sharifingiz, universitetingiz, fakultetingiz, darajangiz (aniq ball emas), tasdiqlangan yutuqlaringiz soni, har bir tasdiqlangan yutuqning nomi, turi, tashkiloti, sanasi, darajasi, natijasi, sertifikat raqami yoki havolasi va «Tasdiqlangan» belgisi, shuningdek profil rasmingiz (agar yuklasangiz). E-pochtangiz va kursingiz hech qachon ochiq koʻrsatilmaydi. Aniq ballni faqat siz, koʻrib chiquvchilar va administratorlar koʻradi.",
+      "Yuklagan hujjatingizni har doim siz, koʻrib chiquvchilar va administratorlar koʻradi. Har bir tasdiqlangan yutuq uchun hujjatni yana kim koʻrishini oʻzingiz tanlaysiz: «Faqat men», «Tasdiqlangan ish beruvchilar» (sukut boʻyicha) yoki «Hamma». «Hamma» faqat hujjatni tekshirib, unda ommaga ochilishini istamagan shaxsiy maʼlumot yoʻqligini tasdiqlaganingizdan keyin yoqiladi. Koʻrib chiquvchi hujjatda shaxsiy maʼlumot (ID yoki pasport raqami, manzil, telefon) borligini belgilasa, hujjat faqat sizga va koʻrib chiquvchilarga koʻrinadi.",
+      "Hujjatlarni suiisteʼmoldan himoya qilish uchun hujjat ochilganda IP manzilingizning qaytarib boʻlmaydigan kodi (xeshi) bir kun saqlanadi; IP manzilning oʻzi saqlanmaydi.",
+      "Maʼlumotlaringiz Oʻzbekistondan tashqaridagi serverlarda saqlanadi. Formalarni avtomatik toʻldirish uchun yuklangan hujjat matnni aniqlash xizmatiga yuborilishi mumkin; unga faqat hujjatning oʻzi yuboriladi, profil maʼlumotlaringiz yuborilmaydi. Bu xizmat ham Oʻzbekistondan tashqarida ishlashi mumkin.",
+      "Istalgan vaqtda fazlddn4@gmail.com manziliga yozib, hisobingiz va hujjatlaringizni oʻchirishni soʻrashingiz mumkin. Batafsil: Maxfiylik siyosati.",
     ].join("\n\n"),
     checkbox: "Ushbu bildirishnoma bilan tanishdim va shaxsiy maʼlumotlarim qayta ishlanishiga roziman.",
     required: "Davom etish uchun rozilik belgisini qoʻying.",
+    russian: "Русская версия",
+    privacyLink: "Maxfiylik siyosati",
+  },
+  // Privacy policy (/privacy). DRAFT until the team's text arrives.
+  privacy: {
+    draft: true,
+    draftLabel: "Qoralama: bu sahifa jamoa tayyorlaydigan yakuniy matn bilan almashtiriladi.",
+    title: "Maxfiylik siyosati",
+    updated: "Yangilangan: {date}",
+    updatedDate: "2026-11-06",
+    russian: "Русская версия",
+    sections: [
+      {
+        title: "Kim javobgar",
+        text: "Jadid Index platformasi talabalar yutuqlarini tan olish uchun ishlab chiqilgan. Pilot bosqichida platformani Jadid Index jamoasi boshqaradi. Savollar uchun: fazlddn4@gmail.com.",
+      },
+      {
+        title: "Qanday maʼlumotlarni toʻplaymiz",
+        text: "Ism-sharif, e-pochta, universitet, fakultet, kurs, yuklangan hujjatlar va ular haqidagi maʼlumotlar (nomi, tashkilot, sana, daraja, natija, sertifikat raqami), koʻrib chiqish natijalari va ballar, hujjat ochilganda IP manzilning xeshi.",
+      },
+      {
+        title: "Nima uchun",
+        text: "Profilingizni yuritish, yutuqlaringizni koʻrib chiqish va baholash, reyting va ochiq profilni koʻrsatish, platformani suiisteʼmoldan himoya qilish.",
+      },
+      {
+        title: "Kim nimani koʻradi",
+        text: "Hamma: ism-sharif, universitet, fakultet, daraja, tasdiqlangan yutuqlar soni va har bir yutuqning maʼlumotlari. Aniq ball va kurs: faqat siz, koʻrib chiquvchilar va administratorlar. E-pochta: hech qachon ochiq emas. Hujjatlar: siz tanlagan koʻrinish boʻyicha (Faqat men, Tasdiqlangan ish beruvchilar yoki Hamma).",
+      },
+      {
+        title: "Hujjatlar",
+        text: "Hujjatlar yopiq omborda saqlanadi. Ruxsat etilgan foydalanuvchi hujjatni ochganda unga 60 soniya amal qiladigan havola beriladi; doimiy havolalar berilmaydi va hujjatlar qidiruv tizimlariga koʻrsatilmaydi. Koʻrib chiquvchi shaxsiy maʼlumot borligini belgilagan hujjat hech qachon ommaga ochilmaydi.",
+      },
+      {
+        title: "Qayerda va qancha saqlanadi",
+        text: "Maʼlumotlar Oʻzbekistondan tashqaridagi serverlarda saqlanadi. Hisobingiz oʻchirilguncha saqlanadi; IP xeshlari bir kundan keyin oʻchiriladi.",
+      },
+      {
+        title: "Sunʼiy intellekt",
+        text: "Formani avtomatik toʻldirish uchun hujjat matnni aniqlash xizmatiga yuborilishi mumkin. Unga faqat hujjat yuboriladi. Sunʼiy intellekt hech narsani hal qilmaydi: qarorni koʻrib chiquvchi qabul qiladi.",
+      },
+      {
+        title: "Huquqlaringiz",
+        text: "Maʼlumotlaringizni koʻrish, tuzatish va hisobingizni hamda hujjatlaringizni oʻchirishni soʻrash huquqiga egasiz. Buning uchun fazlddn4@gmail.com manziliga yozing.",
+      },
+    ] as { title: string; text: string }[],
   },
 
   signup: {
@@ -250,6 +301,54 @@ export const uz = {
     capReached: "Chegara toʻldi",
     resubmit: "Tuzatib qayta yuborish",
     statsError: "Ball maʼlumotlarini yuklab boʻlmadi.",
+    viewWork: "Ochiq sahifasi",
+  },
+  // Who may open an approved work's document (CLAUDE.md rule 4).
+  files: {
+    viewDocument: "Hujjatni koʻrish",
+    visibilityTitle: "Hujjatni kim koʻra oladi",
+    visibility: {
+      private: "Faqat men",
+      verified: "Tasdiqlangan ish beruvchilar",
+      public: "Hamma",
+    } as Record<string, string>,
+    visibilityHelp: {
+      private: "Hujjatni faqat siz, koʻrib chiquvchilar va administratorlar ochadi.",
+      verified: "Platforma tasdiqlagan ish beruvchilar ham ochadi. Hozircha tasdiqlangan ish beruvchi yoʻq.",
+      public: "Ochiq sahifangizga kirgan har kim hujjatni ocha oladi, tizimga kirmaganlar ham.",
+    } as Record<string, string>,
+    alwaysPublic: "Yutuq nomi, tashkilot, sana, daraja va natija har doim ochiq sahifangizda koʻrinadi.",
+    locked:
+      "Koʻrib chiquvchi hujjatda shaxsiy maʼlumot borligini belgilagan, shuning uchun fayl faqat sizga va koʻrib chiquvchilarga koʻrinadi.",
+    saving: "Saqlanmoqda…",
+    saved: "Saqlandi",
+    error: "Saqlab boʻlmadi. Qaytadan urinib koʻring.",
+    publicTitle: "Hujjatni hammaga ochish",
+    publicText:
+      "Hujjat ochiq sahifangizda hammaga koʻrinadi. Ochishdan oldin uni diqqat bilan tekshiring.",
+    previewLabel: "Hujjatni oldindan koʻrish",
+    previewError: "Hujjatni koʻrsatib boʻlmadi. Uni yangi oynada ochib tekshiring.",
+    openInTab: "Yangi oynada ochish",
+    confirmCheckbox:
+      "Hujjatni tekshirdim: unda ommaga ochilishini istamagan ID yoki pasport raqamim, uy manzilim yoki telefon raqamim yoʻq.",
+    confirmPublic: "Hammaga ochish",
+    cancel: "Bekor qilish",
+  },
+  // Public page of one approved work (/works/[id]). Never points (rule 11).
+  work: {
+    verified: "Tasdiqlangan",
+    verifiedHint: "Platforma koʻrib chiquvchisi hujjatni tekshirib tasdiqlagan.",
+    student: "Talaba",
+    type: "Tur",
+    issuer: "Tashkilot",
+    date: "Sana",
+    level: "Daraja",
+    result: "Natija",
+    certificateRef: "Sertifikat raqami / DOI / havola",
+    documentHidden: "Talaba hujjatni ommaga ochmagan.",
+    notFound: "Yutuq topilmadi yoki ochiq emas.",
+    loadError: "Yutuqni yuklab boʻlmadi.",
+    backToStudent: "Talaba profiliga qaytish",
   },
   status: {
     pending: "Koʻrib chiqilmoqda",
@@ -451,6 +550,11 @@ export const uz = {
     ageHours: "{n} soat oldin",
     ageDays: "{n} kun oldin",
     file: "Tasdiqlovchi hujjat",
+    sensitiveLabel: "Hujjatda shaxsiy maʼlumotlar bor (ID raqami, pasport, manzil, telefon)",
+    sensitiveHint:
+      "Belgilansa, fayl faqat talaba, koʻrib chiquvchilar va administratorlarga koʻrinadi. Talaba uni ochiq qila olmaydi.",
+    sensitiveSaved: "Saqlandi",
+    sensitiveError: "Saqlab boʻlmadi. Qaytadan urinib koʻring.",
     openFile: "Faylni yangi oynada ochish",
     fileLinkExpiry: "Havola {minutes} daqiqa amal qiladi. Muddati oʻtsa, sahifani yangilang.",
     fileError: "Faylni ochib boʻlmadi.",
@@ -771,6 +875,9 @@ export const uz = {
     selfReview: "Oʻz yutuqingizni koʻrib chiqa olmaysiz.",
     reviewDateTooEarly: "Yutuq sanasi hisob boshlanish sanasidan ({date}) oldin. Uni faqat rad etish mumkin.",
     reasonRequired: "Rad etish sababini yozing.",
+    sensitiveLocked: "Hujjatda shaxsiy maʼlumot borligi belgilangan, uni ochiq qilib boʻlmaydi.",
+    confirmationRequired: "Hujjatni tekshirganingizni tasdiqlang.",
+    notApproved: "Faqat tasdiqlangan yutuq hujjatini sozlash mumkin.",
   },
 };
 

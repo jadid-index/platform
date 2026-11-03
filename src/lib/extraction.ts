@@ -222,7 +222,7 @@ export async function extractForStudent(
 
   // The path must be the one upload-url issued to this student for this id, recently, and not yet submitted.
   const issued = await getIssuedUpload(studentId, body.submission_id);
-  if (!issued || body.path !== proofPath(studentId, body.submission_id, issued.file_name)) return fail(403, "invalid_path");
+  if (!issued || body.path !== proofPath(body.submission_id, issued.file_name)) return fail(403, "invalid_path");
   if (now.getTime() - new Date(issued.created_at).getTime() > UPLOAD_TICKET_MINUTES * 60_000) return fail(403, "invalid_path");
   if (await submissionExists(body.submission_id)) return fail(409, "invalid_path");
 

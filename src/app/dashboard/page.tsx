@@ -38,6 +38,7 @@ import {
 import type { OwnSubmission, PublicTier, Tier } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+import { FileVisibilityControl } from "./file-visibility-control";
 import { WithdrawButton } from "./withdraw-button";
 import { YearTabs } from "./year-tabs";
 
@@ -298,6 +299,17 @@ async function SubmissionList({ studentId, canResubmit }: { studentId: string; c
                 </div>
               ) : null}
               {s.status === "pending" ? <WithdrawButton submissionId={s.id} /> : null}
+              {s.status === "approved" ? (
+                <>
+                  <Link
+                    href={`/works/${s.id}`}
+                    className="w-fit text-small font-medium text-primary-text underline-offset-4 hover:underline"
+                  >
+                    {t.dashboard.viewWork}
+                  </Link>
+                  <FileVisibilityControl submissionId={s.id} initial={s.file_visibility} locked={s.sensitive_data_flag} />
+                </>
+              ) : null}
             </CardContent>
           </Card>
         </li>

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { getCountFrom } from "@/lib/db";
+import { getCountFrom, proofPath } from "@/lib/db";
 import {
   createSubmissionFromUpload,
   issueProofUpload,
@@ -90,7 +90,7 @@ describe("POST /api/submissions path (issueProofUpload + createSubmissionFromUpl
     // Declared PNG (name and content type), real bytes PDF.
     const issued = await issueProofUpload(alice.id, { file_name: "photo.png", size: 2000, content_type: "image/png" });
     if (!issued.ok) throw new Error(issued.code);
-    const path = `${alice.id}/${issued.submission_id}/${issued.file_name}`;
+    const path = proofPath(issued.submission_id, issued.file_name);
     await uploadProofBytes(path, samplePdf("pdf-as-png"), "image/png");
     const created = await createSubmissionFromUpload(alice.id, {
       ...valid(),
@@ -114,7 +114,7 @@ describe("POST /api/submissions path (issueProofUpload + createSubmissionFromUpl
   it("refuses another student's file path and leaves that file alone", async () => {
     const issued = await issueProofUpload(alice.id, { file_name: "mine.pdf", size: 2000, content_type: "application/pdf" });
     if (!issued.ok) throw new Error(issued.code);
-    const alicePath = `${alice.id}/${issued.submission_id}/${issued.file_name}`;
+    const alicePath = proofPath(issued.submission_id, issued.file_name);
     await uploadProofBytes(alicePath, samplePdf("alice-only"), "application/pdf");
     const body = { ...valid(), submission_id: issued.submission_id, file_name: issued.file_name };
 
@@ -147,7 +147,7 @@ describe("POST /api/submissions path (issueProofUpload + createSubmissionFromUpl
   it("refuses an upload ticket older than the window and deletes the file", async () => {
     const issued = await issueProofUpload(alice.id, { file_name: "late.pdf", size: 2000, content_type: "application/pdf" });
     if (!issued.ok) throw new Error(issued.code);
-    const path = `${alice.id}/${issued.submission_id}/${issued.file_name}`;
+    const path = proofPath(issued.submission_id, issued.file_name);
     await uploadProofBytes(path, samplePdf("late"), "application/pdf");
     const later = new Date(Date.now() + (UPLOAD_TICKET_MINUTES + 1) * 60_000);
     const created = await createSubmissionFromUpload(

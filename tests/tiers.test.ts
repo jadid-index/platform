@@ -195,7 +195,7 @@ describe("public responses", () => {
     for (const v of values) expect(forbiddenKeys(v)).toEqual([]);
   });
 
-  it("the profile route shows tiers and works with level and result only", async () => {
+  it("the profile route shows tiers and works with the consent v2 fields only (no points, no file path)", async () => {
     const { GET } = await import("@/app/api/leaderboard/[studentId]/route");
     const res = await GET(new Request("http://test.local"), { params: Promise.resolve({ studentId: student.id }) });
     const body = (await res.json()) as {
@@ -204,7 +204,7 @@ describe("public responses", () => {
       works: Record<string, unknown>[];
     };
     expect(body.tier?.code).toBe((await getTierFor(200))?.code);
-    expect(Object.keys(body.works[0]).sort()).toEqual(["achievement_date", "level", "result", "title", "type_id", "type_name"].sort());
+    expect(Object.keys(body.works[0]).sort()).toEqual(["achievement_date", "certificate_ref", "file_public", "issuer", "level", "result", "submission_id", "title", "type_id", "type_name"].sort());
   });
 
   it("a hidden profile does not appear in any public view", async () => {

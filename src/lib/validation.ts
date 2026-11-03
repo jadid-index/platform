@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CONSENT_VERSION } from "@/lib/consent";
+import { FILE_VISIBILITIES } from "@/lib/types";
 
 // Shared by the forms and the route handlers. The server always re-validates.
 
@@ -91,7 +92,15 @@ export function todayInTashkent(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date());
 }
 
+// PATCH /api/submissions/:id/visibility. 'public' needs confirm: true (the checkbox in the dialog).
+export const visibilityBodySchema = z
+  .strictObject({ visibility: z.enum(FILE_VISIBILITIES), confirm: z.literal(true).optional() })
+  .refine((b) => b.visibility !== "public" || b.confirm === true, { path: ["confirm"], message: "confirmation_required" });
+
 // -------------------------------------------------------------------- review
+
+// PATCH /api/review/submissions/:id/sensitive
+export const sensitiveBodySchema = z.strictObject({ flag: z.boolean() });
 
 export const REJECTION_REASON_MAX_LENGTH = 1000;
 

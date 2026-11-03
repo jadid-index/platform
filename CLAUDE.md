@@ -30,14 +30,19 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 3. **The browser never writes to the database.** All writes go through server route handlers using the Supabase secret key (`sb_secret_...`).
    The secret key and the AI API key exist only on the server and must never be imported into client code.
    The browser uses only the publishable key (`sb_publishable_...`). Do not use the legacy anon / service_role keys.
-4. **Uploaded proof files are private.** Store them in the private `proofs` bucket and give reviewers short-lived
-   signed URLs. Never show a file or a file URL on the leaderboard or on a public profile.
-5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`) promises:
-   name, university, faculty, score, the number of approved works, and for each approved work its title, type,
-   level, result, date and points, plus the profile photo if the student uploaded one. Never the email, course or
-   files. Do not add anything else to public views; if you must, change the notice and bump its version first.
-   Since rule 11 the public sees less than the notice allows: the score only as a tier, and no per-work points.
-   (The notice text still mentions points; updating it is an open item for the team.)
+4. **Proof files stay in the private `proofs` bucket; visibility decides who may open them.** Object names are
+   neutral (`{submission_id}/document.{ext}`, never the student id or the original file name). The only way to a file
+   is `GET /api/files/:submissionId`: approved submissions only, rate limited, `X-Robots-Tag: noindex`, and a redirect
+   to a signed URL that expires in 60 seconds. Never return a storage path or a long-lived URL in any response.
+   `canViewFile()` (`src/lib/file-access.ts`) decides: owner, reviewers and admins always; `submissions.file_visibility`
+   'public' anyone (set by the owner only after the confirmation dialog, `public_confirmed_at`), 'verified' employers
+   with `employer_profiles.verified = true` (default), 'private' nobody else. A reviewer's `sensitive_data_flag` forces
+   private for good. Changes go only through `set_file_visibility()` / `set_sensitive_flag()` (they write `audit_log`).
+5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v2) promises:
+   name, university, faculty, tier (never points, rule 11), the number of approved works, and for each approved work
+   its title, type, issuer, date, level, result, certificate reference and a verified mark, plus the profile photo
+   if the student uploaded one, plus the document only as rule 4 allows. Never the email, course or exact points.
+   Do not add anything else to public views; if you must, change the notice and bump its version first.
    Google sign-in must not import a profile photo (no avatar_url), and the name from Google is only a
    suggestion that the student confirms, because it is shown publicly.
 6. **Pilot sign-up is open: any email address, no email verification** (team decision, 24 Oct, temporary).
@@ -98,6 +103,8 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 - Language of code and comments: English.
 - One owner for `schema.sql` and migrations. Ask before changing the schema, and add a new migration instead of
   editing an applied one.
+  New migrations are applied by hand in the Supabase SQL editor. Do not run `supabase db push`: the remote migration
+  history only lists the first two files, so it would re-run migrations that are already live.
 - Validate every request body on the server (zod), whatever the form already checks.
 - Keep scope tight. For Thursday, cut these first: photo and bio, appeal comment, extra recognition checks.
   Do not build: blockchain, plagiarism detection, quality scoring, notifications.
@@ -126,12 +133,12 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 
 ## Open items (do not guess, ask the team)
 
-- The Russian consent text (the Uzbek text is approved, version `uz-2026-10-25`).
 - Abandoned uploads: a proof uploaded without step 3 stays in the bucket. Limits cap it at about 300 MB per
   account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (an admin promotes them on `/admin/users`; the first admin is created by SQL).
-- The consent notice (`t.consent`, `uz-2026-10-25`) still says the score and per-work points are public. The public now
-  sees a tier only; the team should reword the notice (tier instead of points) and bump `CONSENT_VERSION`.
+- Consent v2 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) are drafts (`draft: true`, shown as
+  such) until the team's text arrives in `docs/consent-v2.md`. Do not launch with the drafts.
+- Employer verification: `employer_profiles.verified` exists, but there is no admin UI yet and nobody is verified.
 - Tier thresholds are placeholders (based on 4 categories x 100 = 400 points per year).
 - Employer onboarding and what employers can see (the role exists; no employer screens yet).

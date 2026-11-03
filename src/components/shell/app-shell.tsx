@@ -7,6 +7,7 @@ import { LanguageChoices, LanguageSwitch } from "./language-switch";
 import { Logo } from "./logo";
 import { MobileNav } from "./mobile-nav";
 import { NavLinks, NavLinksFallback } from "./nav-links";
+import { SiteFooter } from "./site-footer";
 import { ThemeChoices, ThemeSwitch } from "./theme-switch";
 
 // Frame for every page: a floating pill bar at the top (sticky, a small margin from the edge), no sidebar.
@@ -60,6 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="mx-auto flex w-full max-w-content flex-1 flex-col gap-6 px-4 pt-6 pb-10 lg:px-8 lg:pt-10">
         {children}
       </main>
+      <SiteFooter />
     </div>
   );
 }

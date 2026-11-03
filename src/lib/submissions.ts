@@ -116,7 +116,7 @@ export type IssuedUpload = {
   upload_ticket: string;
 };
 
-// Reserves a submission id and returns a one-time upload URL for proofs/{student_id}/{submission_id}/{file_name}.
+// Reserves a submission id and returns a one-time upload URL for proofs/{submission_id}/document.{ext}.
 export async function issueProofUpload(
   studentId: string,
   body: UploadUrlBody,
@@ -138,7 +138,7 @@ export async function issueProofUpload(
 
   const submissionId = randomUUID();
   await logUploadUrlRequest(studentId, submissionId, fileName);
-  const path = proofPath(studentId, submissionId, fileName);
+  const path = proofPath(submissionId, fileName);
   const uploadUrl = await createProofUploadUrl(path);
   const ticket = signUploadTicket({
     student_id: studentId,
@@ -177,7 +177,7 @@ export async function createSubmissionFromUpload(
   if (await submissionExists(body.submission_id)) return fail(409, "invalid_body");
 
   // From here on the path is the student's own, issued by upload-url.
-  const path = proofPath(studentId, ticket.submission_id, ticket.file_name);
+  const path = proofPath(ticket.submission_id, ticket.file_name);
   const reject = async (status: number, code: string): Promise<Failure> => {
     await deleteProof(path);
     return fail(status, code);

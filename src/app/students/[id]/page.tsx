@@ -13,7 +13,7 @@ import type { PublicStudent } from "@/lib/types";
 
 export const metadata: Metadata = { title: `${t.leaderboard.title} · ${t.common.appName}` };
 
-// Public profile: name, faculty, tier and approved works (level and result only). Never points or files.
+// Public profile: name, faculty, tier and approved works (each links to its work page). Never points or files.
 export default function StudentPage({ params }: PageProps<"/students/[id]">) {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
@@ -84,11 +84,17 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
           <EmptyState text={t.leaderboard.noWorks} />
         ) : (
           <ul className="grid gap-2">
-            {student.works.map((w, i) => (
-              <li key={`${w.title}-${w.achievement_date}-${i}`}>
+            {student.works.map((w) => (
+              <li key={w.submission_id}>
                 <Card className="py-3">
                   <CardContent className="grid gap-1 px-4">
-                    <p className="font-medium break-words">{w.title}</p>
+                    <Link
+                      href={`/works/${w.submission_id}`}
+                      className="font-medium break-words underline-offset-4 hover:text-primary-text hover:underline"
+                    >
+                      {w.title}
+                    </Link>
+                    <p className="text-sm text-muted-foreground break-words">{w.issuer}</p>
                     <p className="text-sm text-muted-foreground">
                       {typeName(w.type_name)} · {t.levels[w.level]}
                       {w.result !== "confirmed" ? ` · ${t.results[w.result]}` : ""}

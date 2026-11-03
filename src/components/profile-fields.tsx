@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
+
 import { Field } from "@/components/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, t } from "@/i18n";
+import { ru } from "@/i18n/ru";
 import type { University } from "@/lib/types";
 
 // Profile part of the sign-up and onboarding forms. Select values are strings ("" = nothing chosen).
@@ -144,9 +147,27 @@ export function ProfileFields({
         <h2 id="consent-title" className="text-sm font-semibold">
           {t.consent.title}
         </h2>
+        {t.consent.draft ? (
+          <p className="w-fit rounded-md bg-warning px-2 py-1 text-xs font-semibold text-warning-foreground">
+            {t.consent.draftLabel}
+          </p>
+        ) : null}
         <div className="max-h-40 overflow-y-auto text-sm whitespace-pre-line text-muted-foreground">
           {t.consent.text}
         </div>
+        <details className="text-sm">
+          <summary className="cursor-pointer font-medium text-primary-text">{t.consent.russian}</summary>
+          <div lang="ru" className="mt-2 max-h-40 overflow-y-auto whitespace-pre-line text-muted-foreground">
+            {ru.consent.text}
+          </div>
+        </details>
+        <Link
+          href="/privacy"
+          target="_blank"
+          className="w-fit text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+        >
+          {t.consent.privacyLink}
+        </Link>
         <div className="flex items-start gap-3">
           <Checkbox
             id="consent"

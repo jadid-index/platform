@@ -45,7 +45,13 @@ export type OwnSubmission = {
   submitted_at: string;
   points_awarded: number | null;
   rejection_reason: string | null;
+  file_visibility: FileVisibility;
+  sensitive_data_flag: boolean;
 };
+
+// Who may open an approved work's document (CLAUDE.md rule 4). The sensitive flag overrides it to private.
+export const FILE_VISIBILITIES = ["private", "verified", "public"] as const;
+export type FileVisibility = (typeof FILE_VISIBILITIES)[number];
 
 // A student's own rejected submission, used to pre-fill its resubmission. Never includes the file.
 export type RejectedSubmission = {
@@ -89,6 +95,7 @@ export type SubmissionForReview = {
   parent_id: string | null;
   submitted_at: string;
   file_path: string;
+  sensitive_data_flag: boolean;
   ai_extraction: unknown; // raw extraction result (src/lib/extraction.ts), null when there was none
   student: { id: string; full_name: string; faculty: string | null; course: number | null };
 };
@@ -145,12 +152,24 @@ export type Leaderboard = {
 };
 
 export type PublicWork = {
+  submission_id: string;
   title: string;
   type_id: number;
   type_name: TypeName;
   level: RubricRow["level"];
   result: RubricRow["result"];
   achievement_date: string;
+  issuer: string;
+  certificate_ref: string | null;
+  file_public: boolean; // the student made the file public and no reviewer flagged it
+};
+
+// One approved work on its public page: the work plus its student's name. Never points or files.
+export type PublicWorkPage = PublicWork & {
+  student_id: string;
+  full_name: string;
+  university: string;
+  faculty: string | null;
 };
 
 export type PublicStudent = {
