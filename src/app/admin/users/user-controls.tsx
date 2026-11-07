@@ -6,20 +6,22 @@ import { useState, useTransition } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { format, t } from "@/i18n";
 import type { AdminUser } from "@/lib/db";
 import { ADMIN_SETTABLE_STATUSES, ROLES } from "@/lib/validation";
 
 // Role and status for one user. Each change is one PATCH; the server checks the admin, protects the last admin
 // and writes the audit row. The list re-renders from the server afterwards.
-export function UserControls({ user }: { user: Pick<AdminUser, "id" | "full_name" | "role" | "status"> }) {
+// For employers also the "verified" switch (more contact requests a day, and documents set to 'verified').
+export function UserControls({ user }: { user: Pick<AdminUser, "id" | "full_name" | "role" | "status" | "employer"> }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   const legacyStatus = !ADMIN_SETTABLE_STATUSES.includes(user.status as (typeof ADMIN_SETTABLE_STATUSES)[number]);
 
-  async function save(change: { role: string } | { status: string }) {
+  async function save(change: { role: string } | { status: string } | { employer_verified: boolean }) {
     setSaving(true);
     setError(null);
     try {
@@ -95,6 +97,23 @@ export function UserControls({ user }: { user: Pick<AdminUser, "id" | "full_name
           </Select>
         </div>
       </div>
+      {user.role === "employer" && user.employer ? (
+        <div className="grid gap-1 lg:w-80">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor={`verified-${user.id}`} className="text-small font-medium">
+              {t.admin.employerVerified}
+            </Label>
+            <Switch
+              id={`verified-${user.id}`}
+              checked={user.employer.verified}
+              disabled={saving}
+              aria-label={format(t.admin.employerVerifiedFor, { name: user.full_name })}
+              onCheckedChange={(v) => save({ employer_verified: v })}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">{user.employer.company_name ?? t.admin.employerNoCompany}</span>
+        </div>
+      ) : null}
       <div aria-live="polite" className="min-h-0 text-small">
         {saving ? (
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">

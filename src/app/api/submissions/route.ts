@@ -21,13 +21,13 @@ export async function GET() {
 // POST: step 3 of adding an achievement. The proof is already in storage (see ./upload-url).
 // Validation follows SPEC.md section 2 and lives in createSubmissionFromUpload().
 export async function POST(request: Request) {
-  const parsed = submissionBodySchema.safeParse(await readJson(request));
-  if (!parsed.success) return apiError(400, "invalid_body");
-
   try {
     // 1. Profile must be an active student. The student id always comes from the session.
     const auth = await requireActiveStudent();
     if (!auth.ok) return apiError(auth.status, auth.error);
+
+    const parsed = submissionBodySchema.safeParse(await readJson(request));
+    if (!parsed.success) return apiError(400, "invalid_body");
 
     const created = await createSubmissionFromUpload(auth.userId, parsed.data);
     if (!created.ok) return apiError(created.status, created.code);

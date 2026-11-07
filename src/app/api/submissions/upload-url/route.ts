@@ -9,17 +9,17 @@ import { uploadUrlBodySchema } from "@/lib/validation";
 // proofs/{submission_id}/document.{ext} plus a short-lived upload ticket. Limits and checks live in
 // issueProofUpload(); the file is checked and hashed in POST /api/submissions.
 export async function POST(request: Request) {
-  const parsed = uploadUrlBodySchema.safeParse(await readJson(request));
-  if (!parsed.success) {
-    const fields = new Set(parsed.error.issues.map((i) => i.path[0]));
-    if (fields.has("size")) return apiError(400, "file_too_large");
-    if (fields.has("content_type")) return apiError(400, "file_type");
-    return apiError(400, "invalid_body");
-  }
-
   try {
     const auth = await requireActiveStudent();
     if (!auth.ok) return apiError(auth.status, auth.error);
+
+    const parsed = uploadUrlBodySchema.safeParse(await readJson(request));
+    if (!parsed.success) {
+      const fields = new Set(parsed.error.issues.map((i) => i.path[0]));
+      if (fields.has("size")) return apiError(400, "file_too_large");
+      if (fields.has("content_type")) return apiError(400, "file_type");
+      return apiError(400, "invalid_body");
+    }
 
     const issued = await issueProofUpload(auth.userId, parsed.data);
     if (!issued.ok) return apiError(issued.status, issued.code);

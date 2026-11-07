@@ -5,7 +5,7 @@ import { CONSENT_VERSION } from "@/lib/consent";
 import { createStudentProfile, listUniversitiesWithFaculties } from "@/lib/db";
 import { safeNextPath } from "@/lib/redirect";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { profileBodySchema, submissionBodySchema } from "@/lib/validation";
+import { profileBodySchema, studentProfileBodySchema, submissionBodySchema } from "@/lib/validation";
 
 import { createTestAuthUser } from "../scripts/lib/test-data";
 import { testRun } from "./helpers";
@@ -15,6 +15,7 @@ const local = testRun("su");
 async function profileBody(extra: Record<string, unknown> = {}) {
   const university = (await listUniversitiesWithFaculties()).find((u) => u.faculties.length > 0)!;
   return {
+    role: "student",
     full_name: "TEST Ochiq Royxat",
     university_id: university.id,
     faculty_id: university.faculties[0].id,
@@ -31,11 +32,12 @@ describe("sign-up (open pilot, CLAUDE.md rule 6)", () => {
     const { data: auth } = await getAdminClient().auth.admin.getUserById(user.id);
     expect(auth.user?.email_confirmed_at ?? null).toBeNull();
 
-    // Same parsing as POST /api/profile: privileged columns in the body are dropped.
-    const parsed = profileBodySchema.parse(
-      await profileBody({ role: "admin", status: "rejected", id: crypto.randomUUID(), photo_path: "x.png" }),
-    );
-    expect(Object.keys(parsed).sort()).toEqual(["consent_version", "course", "faculty_id", "full_name", "university_id"]);
+    // Same parsing as POST /api/profile: the body is strict, so privileged columns are refused, not dropped.
+    for (const extra of [{ role: "admin" }, { role: "reviewer" }, { status: "rejected" }, { id: crypto.randomUUID() }, { photo_path: "x.png" }]) {
+      expect(profileBodySchema.safeParse(await profileBody(extra)).success, JSON.stringify(extra)).toBe(false);
+    }
+    const parsed = studentProfileBodySchema.parse(await profileBody());
+    expect(Object.keys(parsed).sort()).toEqual(["consent_version", "course", "faculty_id", "full_name", "role", "university_id"]);
     expect(await createStudentProfile(user.id, parsed)).toEqual({ ok: true });
 
     const { data } = await getAdminClient().from("profiles").select("id, role, status, photo_path, consent_at").eq("id", user.id).single();
@@ -45,7 +47,7 @@ describe("sign-up (open pilot, CLAUDE.md rule 6)", () => {
 
   it("allows only one profile per user", async () => {
     const user = await createTestAuthUser(local("once"));
-    const body = profileBodySchema.parse(await profileBody());
+    const body = studentProfileBodySchema.parse(await profileBody());
     expect(await createStudentProfile(user.id, body)).toEqual({ ok: true });
     expect(await createStudentProfile(user.id, body)).toEqual({ ok: false, reason: "exists" });
   });

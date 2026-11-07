@@ -8,7 +8,9 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
 - Supabase (Postgres, Auth, Storage) and Next.js route handlers. The secret key (`sb_secret_...`, formerly service_role) is used
   only on the server. If you are not on Supabase, replace `auth.users`, `auth.uid()` and the RLS block.
 - Sign-in: email + password, and "Continue with Google" (OAuth, PKCE). Google users have no profile row until
-  they finish `/onboarding` (name, university, faculty, course, consent), which calls `POST /api/profile`.
+  they finish `/onboarding`, which calls `POST /api/profile`. Sign-up and onboarding first ask "Talaba / Ish beruvchi":
+  students give name, university, faculty, course and consent; employers give company, contact person, phone or
+  Telegram and accept the employer terms (sign-up asks them to use their work email; there is no separate work email field). `?as=employer` preselects the employer path.
 - Files: `schema.sql`, then `seed.sql` (generated from the v0.3 rubric workbook). Both the workbook and `seed.sql` stay as
   the original seed. After the first edit on `/admin/rubric` the database is the source of truth for the rubric.
 - Pilot sign-up is open: any email, no email verification (team decision, 24 Oct, temporary). The
@@ -20,10 +22,12 @@ humans decide. Points come from `rubric_points` (type x level x result), never f
 ## 1. API
 
 All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = admin only (role `admin`, status `active`).
+`E` = employer only (role `employer`, status `active`). Student routes refuse employers, reviewers and admins; employer
+routes refuse students and reviewers (rule 10).
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| POST | `/api/profile` | new user | Create the profile after sign-up. Body: `full_name, university_id, faculty_id, course, consent_version`. Sets `consent_at = now()`, `status = active`. No email-domain or verification check in the pilot. |
+| POST | `/api/profile` | new user | Create the profile after sign-up. Body (strict, one of): `{ role: "student", full_name, university_id, faculty_id, course, consent_version }` or `{ role: "employer", company_name, contact_person, contact, terms_version }`. Only `student` and `employer` can be chosen; any other role or extra key is 400. The role is never read from user metadata. Sets `consent_at = now()`, `status = active`. Employers: `create_employer_profile()`, unverified. No email-domain or verification check in the pilot. 409 `profile_exists`. |
 | GET | `/api/me` | any | Own profile. For a student also, for `?academic_year` (default current): exact points, tier and per-category points toward the cap; and all-time (best academic year): points and tier. No rank. `no-store`. |
 | GET | `/api/meta` | any | Universities, faculties, achievement types, and the rubric rows for the dropdowns. |
 | POST | `/api/extract` | student | Upload one file, get AI-extracted fields back (section 4). Never blocks submission. |
@@ -34,6 +38,13 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = 
 | GET | `/api/files/:submissionId` | see section 3d | 302 to a signed URL valid 60 s. Approved only. 404 when not found, not approved or (signed out) not allowed; 403 for signed-in viewers not allowed; 429 `rate_limited`. Always `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store`. Never the storage path in the body. |
 | GET | `/api/leaderboard` | public | Query: `university_id, faculty_id, academic_year, limit, offset`. Default is the current academic year (`leaderboard_by_year`); pass `academic_year=all` for the all-time view `leaderboard`. The response includes `available_years` for the year tabs. Rows: `student_id, full_name, university, faculty, photo_url, approved_count, tier {code, label, sort_order} \| null`, ordered by tier (best first) then name. No points, rank or approval time. |
 | GET | `/api/leaderboard/:studentId` | public | Name, faculty, `tier` (best academic year), `current_year.tier`, `approved_count`, and approved works (`submission_id`, title, type, issuer, level, result, date, `certificate_ref`, `file_public`). No points, never a file path or URL. |
+| PATCH | `/api/me/open-to-work` | student | Body `{ open_to_work }`. Calls `set_open_to_work()`. |
+| GET | `/api/me/contact-requests` | student | Received requests (company, contact person, verified mark, message, status), pending first, plus `pending` count. |
+| PATCH | `/api/me/contact-requests/:id` | student (owner) | Body `{ action: "decline" }` or `{ action: "accept", kind: "phone" \| "telegram" \| "email", value }`. Calls `respond_contact_request()`. 404 `not_found`, 409 `already_answered`. |
+| GET | `/api/talent` | E or A | Query: `faculty_id, tier, category, page` (20 per page). Active students with `open_to_work`, in public order. Rows: `student_id, full_name, university, faculty, approved_count, tier`. No points, rank or contact. `no-store`. |
+| GET | `/api/talent/:studentId` | E or A | One open-to-work student: the same fields, approved works with `can_view_file` (rule 4) and the employer's latest request (`shared_contact` only after acceptance). Employer views are logged. 404 otherwise. |
+| GET | `/api/talent/requests` | E | The employer's sent requests. `shared_contact` only for accepted requests of active students. |
+| POST | `/api/talent/requests` | E | Body `{ student_id, message (1-500) }`. Calls `create_contact_request()`. 409 `duplicate_pending` / `already_accepted` / `declined_cooldown`, 429 `rate_limited` / `rate_limited_global`, 404 `student_not_available`, 403 `employer_profile_missing`. |
 | GET | `/api/review/queue` | R | Pending submissions, oldest first. |
 | GET | `/api/review/submissions/:id` | R | Submission, signed file URL, `ai_flags`, and the points preview. |
 | POST | `/api/review/submissions/:id/check` | R | Runs the recognition check (section 5), stores `ai_flags`. |
@@ -41,7 +52,7 @@ All routes return JSON. Auth = Supabase session. `R` = reviewer or admin. `A` = 
 | POST | `/api/review/submissions/:id/reject` | R | Body `{ reason }` (required). Calls `reject_submission()`. |
 | PATCH | `/api/review/submissions/:id/sensitive` | R | Body `{ flag }`. Calls `set_sensitive_flag()`; flagging makes the file private for good. Not on own submissions (403 `own_submission`). |
 | GET | `/api/admin/users` | A | Query: `q` (name or email), `role`, `status`, `limit` (max 200), `offset`. Returns `rows` (id, full_name, email, role, status, university, faculty, created_at) and `total`. `Cache-Control: no-store`. |
-| PATCH | `/api/admin/users/:id` | A | Body `{ role }` or `{ status: "active" \| "hidden" }`, exactly one. Calls `admin_set_role()` / `admin_set_status()`. Returns `{ old, new, changed }`. Errors: 409 `last_admin`, 409 `student_fields_missing`, 404 `not_found`. |
+| PATCH | `/api/admin/users/:id` | A | Body `{ role }`, `{ status: "active" \| "hidden" }` or `{ employer_verified: boolean }`, exactly one. Calls `admin_set_role()` / `admin_set_status()` / `admin_set_employer_verified()`. Returns `{ old, new, changed }`. Errors: 409 `last_admin`, 409 `student_fields_missing`, 409 `not_employer`, 404 `not_found`. |
 | GET | `/api/admin/audit` | A | Query: `actor` (name, email or id), `action`, `from`, `to` (YYYY-MM-DD, Tashkent days, inclusive), `limit`, `offset`. Read-only. Returns `rows`, `total`, `actions`. |
 | GET | `/api/admin/rubric` | A | Categories with caps, every type (inactive included, with `in_use`) and every points cell. |
 | POST | `/api/admin/rubric/types` | A | Body: `name {uz, en?}, category_code, base_points, has_placement, proof_hint?, certificate_ref_required, reason`. Creates an active type with no cells. |
@@ -87,8 +98,9 @@ Known gap: a file uploaded in step 2 with no step 3 stays in the bucket; clean u
 
 ## 3a. Roles, status and the admin area
 
-- Roles: `student`, `reviewer`, `employer`, `admin`. Onboarding creates students only (employer onboarding comes later).
-  Every other role is set by an admin on `/admin/users`. There is no self-promotion: `admin_set_role()` requires the
+- Roles: `student`, `reviewer`, `employer`, `admin`. Onboarding creates students or employers (the person chooses;
+  no email verification and no admin approval for employers, rule 6). Reviewer and admin are set only by an admin on
+  `/admin/users`. There is no self-promotion: `admin_set_role()` requires the
   caller to already be an active admin.
 - Status: `active` or `hidden` (set by an admin). Anything other than `active` removes the person from the leaderboard
   and public profiles, and takes away reviewer and admin rights. `pending` / `rejected` are legacy values, treated as hidden.
@@ -166,7 +178,8 @@ After that, further admins and reviewers are promoted on `/admin/users`.
 - `submissions.file_visibility` (`private` / `verified` / `public`, default `verified`), `sensitive_data_flag`
   (reviewers), `public_confirmed_at` (set when the owner confirms public). Constraints: public needs the confirmation;
   a flagged file is always private.
-- `employer_profiles (profile_id, verified, verified_at, verified_by)`: nobody is verified yet; no admin UI yet.
+- `employer_profiles (profile_id, verified, verified_at, verified_by, company_name, ...)`: see section 3e. Admins set
+  `verified` on `/admin/users`.
 - `file_access_log (submission_id, viewer_id, client_key, created_at)`: the rate limit for `/api/files`
   (30 requests per 10 minutes per user, or per HMAC of the IP when signed out). Rows older than a day are deleted.
 - Who may open an approved work's file (`canViewFile()` in `src/lib/file-access.ts`):
@@ -182,8 +195,38 @@ After that, further admins and reviewers are promoted on `/admin/users`.
   required checkbox. Review screen: the sensitive-data checkbox (saved at once).
 - Public work page `/works/:submissionId`: title, type, issuer, date, level, result, certificate reference and a
   verified badge, always; "View document" only for viewers `canViewFile()` allows. The profile links each work to it.
-- Consent v2 (`CONSENT_VERSION = "v2"`, Uzbek and Russian, `docs/consent-v2.md`) describes this; `/privacy` has the
+- Consent v2 (now v3, section 3e; Uzbek and Russian, `docs/consent-v2.md`) describes this; `/privacy` has the
   policy. Both are drafts until the team's text arrives.
+
+## 3e. Employers and the talent directory (migration `20261107000000`)
+
+- `employer_profiles` gains `company_name, contact_person, contact (phone or Telegram), created_at`
+  (check `employer_fields`). `create_employer_profile()` fixes the role to `employer`, writes `employer.onboarded`.
+  The employer accepts the draft terms `t.employerTerms` (`EMPLOYER_TERMS_VERSION = "employer-v1"`, stored in
+  `profiles.consent_version`). An employer created by an admin without company details cannot send requests
+  (`employer_profile_missing`).
+- `profiles.open_to_work` (default false). The student switches it on `/offers` ("Takliflar", students only), with
+  an explanation; audit `profile.open_to_work`.
+- `/talent` (employers and admins; proxy gate fails closed, then every page and handler checks): active students with
+  `open_to_work`, from `talent_directory()`. Name, university, faculty, all-time tier, approved-work count; filters
+  faculty, tier, category (has an approved work in it); 20 per page; order tier then name. Students without approved
+  work show "–". `/talent/:id`: approved works (metadata; "View document" only if `canViewFile()` allows), and the
+  request form. Never points, rank, email, course or contact details. Admins may browse but not send requests.
+- `contact_requests (employer_id, student_id, message 1-500, status pending | accepted | declined,
+  shared_contact_kind, shared_contact_value, created_at, responded_at)`. One pending request per pair (partial unique
+  index). `create_contact_request()` (one global advisory lock) refuses: `duplicate_pending`, `already_accepted`,
+  `declined_cooldown` (30 days after a decline), `rate_limited` (10 a day, 30 when verified, rolling 24 h),
+  `rate_limited_global` (`CONTACT_REQUESTS_DAILY_CAP`, default 300, across all employers).
+- The student sees requests on `/offers` (new first, badge with the pending count, also on the "Takliflar" nav
+  link; the dashboard shows a link when there are new ones). `/offers` also previews the student's own
+  talent-directory card (public fields only). No email is sent.
+  Accept asks which one contact to share (phone, Telegram or email, the account email is prefilled) and stores only
+  that; only then does the employer see it (`/talent/requests`, `/talent/:id`), and only while the student is active.
+  Decline needs a confirmation. The contact value is never written to `audit_log`.
+- Audit actions: `employer.onboarded`, `employer.verified_changed {old,new}`, `employer.profile_viewed`
+  (actor employer, entity_id student, `details.page` = `talent` or `public_profile`; each view, admins are not logged),
+  `contact_request.created`, `contact_request.accepted {kind}`, `contact_request.declined`, `profile.open_to_work`.
+- Consent v3 adds a paragraph about the directory and contact requests; the privacy policy has an "Employers" section.
 
 ## 4. AI extraction (`POST /api/extract`)
 

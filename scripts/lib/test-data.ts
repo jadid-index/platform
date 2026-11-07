@@ -8,8 +8,8 @@
 
 import { createHash, randomBytes } from "node:crypto";
 
-import { CONSENT_VERSION } from "@/lib/consent";
-import { createStudentProfile, getMeta, listUniversitiesWithFaculties, proofPath } from "@/lib/db";
+import { CONSENT_VERSION, EMPLOYER_TERMS_VERSION } from "@/lib/consent";
+import { createEmployerProfile, createStudentProfile, getMeta, listUniversitiesWithFaculties, proofPath } from "@/lib/db";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createSubmissionFromUpload, issueProofUpload } from "@/lib/submissions";
 import type { Meta, TypeName } from "@/lib/types";
@@ -94,13 +94,25 @@ export function createTestAdmin(local: string, fullName: string): Promise<TestUs
   return createTestStaff(local, fullName, "admin");
 }
 
-// An employer with an employer_profiles row (verified or not). Verification has no UI yet; admins set it later.
+// An employer through the same code path as employer onboarding (POST /api/profile), then verified or not.
+// Verification is an admin action on /admin/users; tests set it directly.
 export async function createTestEmployer(local: string, fullName: string, verified: boolean): Promise<TestUser> {
-  const user = await createTestStaff(local, fullName, "employer");
-  const { error } = await getAdminClient()
-    .from("employer_profiles")
-    .insert({ profile_id: user.id, verified, verified_at: verified ? new Date().toISOString() : null });
-  if (error) throw error;
+  const user = await createTestAuthUser(local, { confirmed: true });
+  const result = await createEmployerProfile(user.id, {
+    role: "employer",
+    company_name: `TEST ${fullName} LLC`,
+    contact_person: `TEST ${fullName}`,
+    contact: "@test_employer",
+    terms_version: EMPLOYER_TERMS_VERSION,
+  });
+  if (!result.ok) throw new Error(`createEmployerProfile failed: ${result.reason}`);
+  if (verified) {
+    const { error } = await getAdminClient()
+      .from("employer_profiles")
+      .update({ verified: true, verified_at: new Date().toISOString() })
+      .eq("profile_id", user.id);
+    if (error) throw error;
+  }
   return user;
 }
 

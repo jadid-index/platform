@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeCheck, FlaskConical, HandHeart, Lightbulb, Sprout, Trophy, Upload, type LucideIcon } from "lucide-react";
+import { ArrowRight, BadgeCheck, BriefcaseBusiness, Check, FlaskConical, HandHeart, Lightbulb, Sprout, Trophy, Upload, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -105,6 +105,34 @@ export default function HomePage() {
             );
           })}
         </ol>
+      </section>
+
+      <section
+        aria-labelledby="employers-title"
+        className="grid gap-5 rounded-3xl border bg-surface-raised p-6 shadow-card sm:p-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+      >
+        <div className="grid gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-contrast">
+              <BriefcaseBusiness className="size-5" aria-hidden />
+            </span>
+            <h2 id="employers-title" className="text-h2">
+              {t.home.employers.title}
+            </h2>
+          </div>
+          <p>{t.home.employers.text}</p>
+          <ul className="grid gap-2">
+            {t.home.employers.points.map((point) => (
+              <li key={point} className="flex items-start gap-2 text-small">
+                <Check className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden />
+                {point}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <Suspense fallback={<PrimaryAction href="/signup?as=employer" label={t.home.employers.cta} />}>
+          <EmployerAction />
+        </Suspense>
       </section>
 
       <section
@@ -328,7 +356,7 @@ function TopCard({
   return (
     <Card className="h-full gap-4 py-5">
       <CardHeader className="flex items-start gap-3 px-5">
-        {badge}
+        {/* {badge} */}
         <div className="grid gap-1.5">
           <CardTitle id="top-title" className="text-h2">
             {t.home.topTitle}
@@ -371,6 +399,16 @@ function TopStudentsSkeleton() {
       </CardContent>
     </Card>
   );
+}
+
+// Guests get the employer sign-up path; employers and admins the directory; students nothing (they are not employers).
+async function EmployerAction() {
+  const viewer = await getShellViewer();
+  if (viewer.kind === "guest") return <PrimaryAction href="/signup?as=employer" label={t.home.employers.cta} />;
+  if (viewer.kind === "member" && (viewer.role === "employer" || viewer.role === "admin")) {
+    return <PrimaryAction href="/talent" label={t.home.employers.ctaMember} />;
+  }
+  return null;
 }
 
 // Guests are asked to sign up, students to add an achievement, everyone else goes to the dashboard.

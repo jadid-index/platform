@@ -189,6 +189,7 @@ export function ProfileFields({
 
 export function toProfileBody(values: ProfileValues, consentVersion: string) {
   return {
+    role: "student" as const,
     full_name: values.fullName.trim(),
     university_id: Number(values.universityId),
     faculty_id: Number(values.facultyId),

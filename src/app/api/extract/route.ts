@@ -11,12 +11,13 @@ import { extractBodySchema } from "@/lib/validation";
 export const maxDuration = 30;
 
 export async function POST(request: Request) {
-  const parsed = extractBodySchema.safeParse(await readJson(request));
-  if (!parsed.success) return apiError(400, "invalid_body");
-
   try {
     const auth = await requireActiveStudent();
     if (!auth.ok) return apiError(auth.status, auth.error);
+
+    const parsed = extractBodySchema.safeParse(await readJson(request));
+    if (!parsed.success) return apiError(400, "invalid_body");
+
     const res = await extractForStudent(auth.userId, parsed.data);
     if (!res.ok) return apiError(res.status, res.code);
     return NextResponse.json({ result: res.result, extraction_token: res.extraction_token });

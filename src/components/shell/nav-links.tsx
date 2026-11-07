@@ -1,6 +1,6 @@
-import { t } from "@/i18n";
+import { format, t } from "@/i18n";
 
-import { getShellViewer } from "./access";
+import { getPendingRequestCount, getShellViewer } from "./access";
 import { NavItem } from "./nav-item";
 import { NavLinkView, type NavLayout } from "./nav-link-view";
 
@@ -10,13 +10,16 @@ export function NavLinksFallback({ layout }: { layout: NavLayout }) {
 }
 
 // The links the viewer's role may open. Display only: every page and API route checks access on the server.
-// Home is the logo. Employers get no link yet: there is no employer screen.
+// Home is the logo. Students get /offers, which carries the new-request badge. Employers get the talent directory
+// and their sent requests; admins also see the directory.
 export async function NavLinks({ layout }: { layout: NavLayout }) {
   const viewer = await getShellViewer();
   const member = viewer.kind === "member" && viewer.active ? viewer : null;
   const isStudent = member?.role === "student";
   const isReviewer = member?.role === "reviewer" || member?.role === "admin";
   const isAdmin = member?.role === "admin";
+  const isEmployer = member?.role === "employer";
+  const pending = isStudent && member ? await getPendingRequestCount(member.id) : 0;
 
   return (
     <>
@@ -27,9 +30,18 @@ export async function NavLinks({ layout }: { layout: NavLayout }) {
       {isStudent ? (
         <>
           <NavItem href="/dashboard" label={t.nav.myAchievements} icon="achievements" layout={layout} />
-          <NavItem href="/achievements/new" label={t.nav.addAchievement} icon="add" layout={layout} />
+          <NavItem
+            href="/offers"
+            label={t.nav.offers}
+            icon="offers"
+            layout={layout}
+            count={pending}
+            countLabel={format(t.nav.newRequests, { n: pending })}
+          />
         </>
       ) : null}
+      {isEmployer || isAdmin ? <NavItem href="/talent" label={t.nav.talent} icon="talent" layout={layout} /> : null}
+      {isEmployer ? <NavItem href="/talent/requests" label={t.nav.myRequests} icon="requests" layout={layout} /> : null}
       {isReviewer ? <NavItem href="/review" label={t.nav.reviewQueue} icon="review" layout={layout} /> : null}
       {isAdmin ? (
         <NavItem href="/admin/users" match="/admin" label={t.nav.admin} icon="admin" layout={layout} />

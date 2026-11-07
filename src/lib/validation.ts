@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { CONSENT_VERSION } from "@/lib/consent";
+import { CONSENT_VERSION, EMPLOYER_TERMS_VERSION } from "@/lib/consent";
 import { FILE_VISIBILITIES } from "@/lib/types";
 
 // Shared by the forms and the route handlers. The server always re-validates.
@@ -9,7 +9,14 @@ export const emailSchema = z.string().trim().toLowerCase().pipe(z.email());
 
 export const PASSWORD_MIN_LENGTH = 8;
 
-export const profileBodySchema = z.object({
+// Phone (digits, spaces, dashes, brackets, optional leading +) or a Telegram username (@name).
+export const PHONE_RE = /^\+?[0-9][0-9 ()-]{6,19}$/;
+export const TELEGRAM_RE = /^@[A-Za-z0-9_]{5,32}$/;
+export const phoneSchema = z.string().trim().regex(PHONE_RE);
+export const telegramSchema = z.string().trim().regex(TELEGRAM_RE);
+
+export const studentProfileBodySchema = z.strictObject({
+  role: z.literal("student"),
   full_name: z.string().trim().min(3).max(120),
   university_id: z.number().int().positive(),
   faculty_id: z.number().int().positive(),
@@ -17,7 +24,71 @@ export const profileBodySchema = z.object({
   consent_version: z.literal(CONSENT_VERSION),
 });
 
+export const employerProfileBodySchema = z.strictObject({
+  role: z.literal("employer"),
+  company_name: z.string().trim().min(2).max(120),
+  contact_person: z.string().trim().min(3).max(120),
+  contact: z.union([phoneSchema, telegramSchema]),
+  terms_version: z.literal(EMPLOYER_TERMS_VERSION),
+});
+
+// POST /api/profile. The only roles anyone may choose for themselves are student and employer (CLAUDE.md rule 10).
+// Strict: any key that does not belong to the chosen shape (verified, status, a second role field, ...) is a 400.
+export const profileBodySchema = z.discriminatedUnion("role", [studentProfileBodySchema, employerProfileBodySchema]);
+
+export type StudentProfileBody = z.infer<typeof studentProfileBodySchema>;
+export type EmployerProfileBody = z.infer<typeof employerProfileBodySchema>;
 export type ProfileBody = z.infer<typeof profileBodySchema>;
+
+// ----------------------------------------------------------------- employers
+
+export const CONTACT_MESSAGE_MAX = 500;
+export const CONTACT_KINDS = ["phone", "telegram", "email"] as const;
+export type ContactKind = (typeof CONTACT_KINDS)[number];
+export const TALENT_PAGE_SIZE = 20;
+
+export const openToWorkBodySchema = z.strictObject({ open_to_work: z.boolean() });
+
+export const contactRequestBodySchema = z.strictObject({
+  student_id: z.uuid(),
+  message: z.string().trim().min(1).max(CONTACT_MESSAGE_MAX),
+});
+
+// Accept with exactly one contact detail of the chosen kind, or decline with nothing else.
+export const contactResponseBodySchema = z.union([
+  z.strictObject({ action: z.literal("decline") }),
+  z.strictObject({ action: z.literal("accept"), kind: z.literal("phone"), value: phoneSchema }),
+  z.strictObject({ action: z.literal("accept"), kind: z.literal("telegram"), value: telegramSchema }),
+  z.strictObject({ action: z.literal("accept"), kind: z.literal("email"), value: emailSchema }),
+]);
+export type ContactResponseBody = z.infer<typeof contactResponseBodySchema>;
+
+const optionalQueryId = z.coerce.number().int().positive().optional().catch(undefined);
+
+export const talentQuerySchema = z.object({
+  faculty_id: optionalQueryId,
+  tier: z.string().trim().regex(/^[A-Za-z0-9+-]{1,8}$/).optional().catch(undefined),
+  category: z.string().trim().regex(/^[a-z_]{1,40}$/).optional().catch(undefined),
+  page: z.coerce.number().int().min(1).max(1000).default(1).catch(1),
+});
+export type TalentQuery = z.infer<typeof talentQuerySchema>;
+
+// Exceptions raised by the employer SQL functions are already stable codes (20261107000000).
+export const CONTACT_ERRORS: Record<string, number> = {
+  not_active_employer: 403,
+  employer_profile_missing: 403,
+  not_active_student: 403,
+  student_not_available: 404,
+  invalid_message: 400,
+  duplicate_pending: 409,
+  already_accepted: 409,
+  declined_cooldown: 409,
+  rate_limited: 429,
+  rate_limited_global: 429,
+  not_found: 404,
+  already_answered: 409,
+  contact_required: 400,
+};
 
 // ---------------------------------------------------------------- submissions
 
@@ -183,6 +254,7 @@ export type AdminUsersQuery = Partial<z.infer<typeof adminUsersQuerySchema>> & {
 export const adminUserPatchSchema = z.union([
   z.strictObject({ role: z.enum(ROLES) }),
   z.strictObject({ status: z.enum(ADMIN_SETTABLE_STATUSES) }),
+  z.strictObject({ employer_verified: z.boolean() }),
 ]);
 export type AdminUserPatch = z.infer<typeof adminUserPatchSchema>;
 
@@ -203,6 +275,7 @@ export function adminErrorFromSql(message: string): string {
     "user not found": "not_found",
     "last admin": "last_admin",
     "invalid status": "invalid_body",
+    "not an employer": "not_employer",
   };
   return known[message] ?? "sql_error";
 }

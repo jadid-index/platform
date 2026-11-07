@@ -1,7 +1,9 @@
 import {
   Award,
+  BriefcaseBusiness,
   ClipboardCheck,
-  PlusCircle,
+  Handshake,
+  Send,
   ShieldCheck,
   Trophy,
   UserRoundCheck,
@@ -14,17 +16,20 @@ import { cn } from "@/lib/utils";
 const ICONS = {
   leaderboard: Trophy,
   achievements: Award,
-  add: PlusCircle,
   review: ClipboardCheck,
   onboarding: UserRoundCheck,
   admin: ShieldCheck,
+  talent: BriefcaseBusiness,
+  requests: Send,
+  offers: Handshake,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIcon = keyof typeof ICONS;
 // pill: inline in the floating bar (lg and up); sheet: full-width rows in the mobile menu.
 export type NavLayout = "pill" | "sheet";
 
-export type NavLinkProps = { href: string; label: string; icon: NavIcon; layout: NavLayout };
+// count: a number badge after the label (new contact requests); countLabel is its text for screen readers.
+export type NavLinkProps = { href: string; label: string; icon: NavIcon; layout: NavLayout; count?: number; countLabel?: string };
 
 const LAYOUTS: Record<NavLayout, { base: string; active: string; idle: string; icon: string }> = {
   pill: {
@@ -43,7 +48,15 @@ const LAYOUTS: Record<NavLayout, { base: string; active: string; idle: string; i
 
 // Presentational nav link. Server-safe: the active state is passed in. The icon always has its text label;
 // the active link is marked by fill, weight and aria-current, not by color alone.
-export function NavLinkView({ href, label, icon, layout, active = false }: NavLinkProps & { active?: boolean }) {
+export function NavLinkView({
+  href,
+  label,
+  icon,
+  layout,
+  count,
+  countLabel,
+  active = false,
+}: NavLinkProps & { active?: boolean }) {
   const Icon = ICONS[icon];
   const style = LAYOUTS[layout];
   return (
@@ -59,6 +72,12 @@ export function NavLinkView({ href, label, icon, layout, active = false }: NavLi
     >
       <Icon className={cn("shrink-0", style.icon)} aria-hidden />
       {label}
+      {count ? (
+        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-inverse px-1.5 text-xs font-bold text-surface-inverse-foreground tabular">
+          <span aria-hidden>{count}</span>
+          <span className="sr-only">{countLabel ?? count}</span>
+        </span>
+      ) : null}
     </Link>
   );
 }

@@ -6,6 +6,16 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { Field } from "@/components/field";
+import {
+  AccountTypeChoice,
+  EmployerFields,
+  emptyEmployerValues,
+  toEmployerBody,
+  validateEmployerValues,
+  type AccountType,
+  type EmployerErrors,
+  type EmployerValues,
+} from "@/components/employer-fields";
 import { GoogleButton, OrDivider } from "@/components/google-button";
 import {
   emptyProfileValues,
@@ -24,10 +34,12 @@ import { createAuthClient } from "@/lib/supabase/client";
 import type { University } from "@/lib/types";
 import { emailSchema, PASSWORD_MIN_LENGTH } from "@/lib/validation";
 
-type Errors = ProfileErrors & { email?: string; password?: string };
+type Errors = ProfileErrors & EmployerErrors & { email?: string; password?: string };
 
-export function SignupForm({ universities }: { universities: University[] }) {
+export function SignupForm({ universities, initialType }: { universities: University[]; initialType: AccountType }) {
   const router = useRouter();
+  const [accountType, setAccountType] = useState<AccountType>(initialType);
+  const [employer, setEmployer] = useState<EmployerValues>(emptyEmployerValues);
   const [profile, setProfile] = useState<ProfileValues>(() => emptyProfileValues(universities));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,7 +52,8 @@ export function SignupForm({ universities }: { universities: University[] }) {
     event.preventDefault();
     setFormError(null);
 
-    const nextErrors: Errors = validateProfileValues(profile);
+    const isEmployer = accountType === "employer";
+    const nextErrors: Errors = isEmployer ? validateEmployerValues(employer) : validateProfileValues(profile);
     const parsedEmail = emailSchema.safeParse(email);
     if (!parsedEmail.success) nextErrors.email = t.errors.emailInvalid;
     if (password.length < PASSWORD_MIN_LENGTH) nextErrors.password = t.errors.passwordTooShort;
@@ -52,14 +65,16 @@ export function SignupForm({ universities }: { universities: University[] }) {
       // 1. Create the auth user. Pilot sign-up is open (any email, no verification), so with
       //    "Confirm email" off in Supabase Auth this returns a session right away.
       //    The profile fields also travel in user metadata, so onboarding can prefill them.
-      const profileBody = toProfileBody(profile, CONSENT_VERSION);
+      const profileBody = isEmployer ? toEmployerBody(employer) : toProfileBody(profile, CONSENT_VERSION);
       const supabase = createAuthClient();
       const { data, error } = await supabase.auth.signUp({
         email: parsedEmail.data,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/confirm`,
-          data: profileBody,
+          // Metadata is only a prefill for onboarding: the student fields, or for employers just the choice
+          // (signup_as). The role is never read from metadata; POST /api/profile decides it from the body.
+          data: isEmployer ? { signup_as: "employer" } : { ...profileBody, role: undefined },
         },
       });
       if (error) {
@@ -80,7 +95,7 @@ export function SignupForm({ universities }: { universities: University[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(profileBody),
       });
-      router.replace(res.ok || res.status === 409 ? "/dashboard" : "/onboarding");
+      router.replace(res.ok || res.status === 409 ? (isEmployer ? "/talent" : "/dashboard") : isEmployer ? "/onboarding?as=employer" : "/onboarding");
       router.refresh();
     } catch {
       setFormError(t.common.genericError);
@@ -104,10 +119,16 @@ export function SignupForm({ universities }: { universities: University[] }) {
 
   return (
     <form className="grid gap-5" noValidate onSubmit={onSubmit}>
+      <AccountTypeChoice value={accountType} disabled={submitting} onChange={setAccountType} />
       <GoogleButton disabled={submitting} />
       <OrDivider />
 
-      <Field id="email" label={t.form.email} error={errors.email}>
+      <Field
+        id="email"
+        label={t.form.email}
+        error={errors.email}
+        hint={accountType === "employer" ? t.employerForm.emailHint : undefined}
+      >
         <Input
           id="email"
           name="email"
@@ -115,11 +136,11 @@ export function SignupForm({ universities }: { universities: University[] }) {
           inputMode="email"
           autoComplete="email"
           className="h-10"
-          placeholder={t.form.emailPlaceholder}
+          placeholder={accountType === "employer" ? t.employerForm.emailPlaceholder : t.form.emailPlaceholder}
           value={email}
           disabled={submitting}
           aria-invalid={!!errors.email}
-          aria-describedby={errors.email ? "email-message" : undefined}
+          aria-describedby={errors.email || accountType === "employer" ? "email-message" : undefined}
           onChange={(e) => setEmail(e.target.value)}
         />
       </Field>
@@ -139,13 +160,17 @@ export function SignupForm({ universities }: { universities: University[] }) {
         />
       </Field>
 
-      <ProfileFields
-        universities={universities}
-        values={profile}
-        errors={errors}
-        disabled={submitting}
-        onChange={setProfile}
-      />
+      {accountType === "employer" ? (
+        <EmployerFields values={employer} errors={errors} disabled={submitting} onChange={setEmployer} />
+      ) : (
+        <ProfileFields
+          universities={universities}
+          values={profile}
+          errors={errors}
+          disabled={submitting}
+          onChange={setProfile}
+        />
+      )}
 
       {formError ? (
         <Alert variant="destructive">
@@ -153,7 +178,7 @@ export function SignupForm({ universities }: { universities: University[] }) {
         </Alert>
       ) : null}
 
-      <Button type="submit" size="lg" className="w-full" disabled={!profile.consent || submitting}>
+      <Button type="submit" size="lg" className="w-full" disabled={(accountType === "employer" ? !employer.terms : !profile.consent) || submitting}>
         {submitting ? t.signup.submitting : t.signup.submit}
       </Button>
 

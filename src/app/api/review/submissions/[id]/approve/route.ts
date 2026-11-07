@@ -10,14 +10,14 @@ import { approveBodySchema } from "@/lib/validation";
 // Body { type_id, level, result }. The reviewer may correct the student's choice.
 // Points and the yearly cap are applied by approve_submission() in SQL.
 export async function POST(request: Request, ctx: RouteContext<"/api/review/submissions/[id]/approve">) {
-  const id = z.uuid().safeParse((await ctx.params).id);
-  if (!id.success) return apiError(400, "invalid_body");
-  const body = approveBodySchema.safeParse(await readJson(request));
-  if (!body.success) return apiError(400, "invalid_body");
-
   try {
     const auth = await requireReviewer();
     if (!auth.ok) return apiError(auth.status, auth.error);
+
+    const id = z.uuid().safeParse((await ctx.params).id);
+    if (!id.success) return apiError(400, "invalid_body");
+    const body = approveBodySchema.safeParse(await readJson(request));
+    if (!body.success) return apiError(400, "invalid_body");
 
     const type = await getAchievementType(body.data.type_id);
     if (!type) return apiError(400, "invalid_combination");

@@ -4,6 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import {
+  AccountTypeChoice,
+  EmployerFields,
+  emptyEmployerValues,
+  toEmployerBody,
+  validateEmployerValues,
+  type AccountType,
+  type EmployerErrors,
+  type EmployerValues,
+} from "@/components/employer-fields";
+import {
   ProfileFields,
   toProfileBody,
   validateProfileValues,
@@ -25,11 +35,16 @@ const API_ERRORS: Record<string, string> = {
 export function OnboardingForm({
   universities,
   initial,
+  initialType,
 }: {
   universities: University[];
   initial: ProfileValues;
+  initialType: AccountType;
 }) {
   const router = useRouter();
+  const [accountType, setAccountType] = useState<AccountType>(initialType);
+  const [employer, setEmployer] = useState<EmployerValues>(emptyEmployerValues);
+  const [employerErrors, setEmployerErrors] = useState<EmployerErrors>({});
   const [values, setValues] = useState<ProfileValues>(() => {
     // Drop a stale faculty or university that no longer exists.
     const university = universities.find((u) => String(u.id) === initial.universityId);
@@ -48,20 +63,28 @@ export function OnboardingForm({
     event.preventDefault();
     setFormError(null);
 
-    const nextErrors = validateProfileValues(values);
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    const isEmployer = accountType === "employer";
+    if (isEmployer) {
+      const nextErrors = validateEmployerValues(employer);
+      setEmployerErrors(nextErrors);
+      if (Object.keys(nextErrors).length > 0) return;
+    } else {
+      const nextErrors = validateProfileValues(values);
+      setErrors(nextErrors);
+      if (Object.keys(nextErrors).length > 0) return;
+    }
 
     setSubmitting(true);
     try {
       const res = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(toProfileBody(values, CONSENT_VERSION)),
+        body: JSON.stringify(isEmployer ? toEmployerBody(employer) : toProfileBody(values, CONSENT_VERSION)),
       });
-      // 409 means the profile already exists, so the dashboard is the right place either way.
+      // 409 means the profile already exists, so the dashboard is the right place either way
+      // (it sends employers on to /talent).
       if (res.ok || res.status === 409) {
-        router.replace("/dashboard");
+        router.replace(isEmployer && res.ok ? "/talent" : "/dashboard");
         router.refresh();
         return;
       }
@@ -76,13 +99,19 @@ export function OnboardingForm({
 
   return (
     <form className="grid gap-5" noValidate onSubmit={onSubmit}>
-      <ProfileFields
-        universities={universities}
-        values={values}
-        errors={errors}
-        disabled={submitting}
-        onChange={setValues}
-      />
+      <AccountTypeChoice value={accountType} disabled={submitting} onChange={setAccountType} />
+
+      {accountType === "employer" ? (
+        <EmployerFields values={employer} errors={employerErrors} disabled={submitting} onChange={setEmployer} />
+      ) : (
+        <ProfileFields
+          universities={universities}
+          values={values}
+          errors={errors}
+          disabled={submitting}
+          onChange={setValues}
+        />
+      )}
 
       {formError ? (
         <Alert variant="destructive">
@@ -90,7 +119,7 @@ export function OnboardingForm({
         </Alert>
       ) : null}
 
-      <Button type="submit" size="lg" className="w-full" disabled={!values.consent || submitting}>
+      <Button type="submit" size="lg" className="w-full" disabled={(accountType === "employer" ? !employer.terms : !values.consent) || submitting}>
         {submitting ? t.onboarding.submitting : t.onboarding.submit}
       </Button>
     </form>

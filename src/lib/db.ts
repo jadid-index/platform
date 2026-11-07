@@ -28,7 +28,15 @@ import type {
   TopTier,
   TypeName,
   University,
+  EmployerRequestState,
+  EmployerSentRequest,
+  StudentContactRequest,
+  TalentList,
+  TalentRow,
+  TalentStudent,
+  TalentWork,
 } from "@/lib/types";
+import { canViewFile, type FileViewer } from "@/lib/file-access";
 import {
   adminErrorFromSql,
   rubricErrorFromSql,
@@ -37,8 +45,12 @@ import {
   type AdminUsersQuery,
   type Level,
   type PointsCell,
-  type ProfileBody,
+  TALENT_PAGE_SIZE,
+  type ContactResponseBody,
+  type EmployerProfileBody,
   type ProfileStatus,
+  type StudentProfileBody,
+  type TalentQuery,
   type Result,
   type Role,
   type TierBody,
@@ -106,7 +118,10 @@ export async function getProfileSummary(userId: string): Promise<ProfileSummary 
 export type CreateProfileResult = { ok: true } | { ok: false; reason: "exists" };
 
 // Creates a student profile. Pilot sign-up is open, so any email is accepted (CLAUDE.md rule 6).
-export async function createStudentProfile(userId: string, body: ProfileBody): Promise<CreateProfileResult> {
+export async function createStudentProfile(
+  userId: string,
+  body: Omit<StudentProfileBody, "role"> & { role?: "student" },
+): Promise<CreateProfileResult> {
   const { error } = await getAdminClient().from("profiles").insert({
     id: userId,
     full_name: body.full_name,
@@ -745,7 +760,8 @@ function tierOf(r: { tier_code: string | null; tier_label: TypeName | null; tier
 const byName = new Intl.Collator("uz", { sensitivity: "base" });
 
 // Public order: tier (best first, no tier last), then name. There is no rank and no tie-breaking by approval.
-export function comparePublicRows(a: LeaderboardRow, b: LeaderboardRow): number {
+type PublicOrderRow = Pick<LeaderboardRow, "student_id" | "full_name" | "tier">;
+export function comparePublicRows(a: PublicOrderRow, b: PublicOrderRow): number {
   const ta = a.tier?.sort_order ?? Number.MAX_SAFE_INTEGER;
   const tb = b.tier?.sort_order ?? Number.MAX_SAFE_INTEGER;
   return ta - tb || byName.compare(a.full_name, b.full_name) || a.student_id.localeCompare(b.student_id);
@@ -1169,6 +1185,7 @@ export type AdminUser = {
   created_at: string;
   year_points: number | null; // students only: approved points in the current academic year
   tier: PublicTier | null;
+  employer: { company_name: string | null; verified: boolean } | null; // employers only
 };
 
 export async function listUsersForAdmin(query: AdminUsersQuery): Promise<{ rows: AdminUser[]; total: number }> {
@@ -1180,16 +1197,21 @@ export async function listUsersForAdmin(query: AdminUsersQuery): Promise<{ rows:
     p_offset: query.offset,
   });
   if (error) throw error;
-  const rows = (data ?? []) as (Omit<AdminUser, "year_points" | "tier"> & { total_count: number })[];
+  const rows = (data ?? []) as (Omit<AdminUser, "year_points" | "tier" | "employer"> & { total_count: number })[];
   // Admins see exact points: students' current-year points and the tier they give.
   const students = rows.filter((r) => r.role === "student").map((r) => r.id);
-  const [points, tiers] = students.length
-    ? await Promise.all([getYearPointsFor(students, await getCurrentAcademicYear()), listTiers()])
-    : [new Map<string, number>(), [] as Tier[]];
+  const employers = rows.filter((r) => r.role === "employer").map((r) => r.id);
+  const [[points, tiers], companies] = await Promise.all([
+    students.length
+      ? Promise.all([getYearPointsFor(students, await getCurrentAcademicYear()), listTiers()])
+      : Promise.resolve([new Map<string, number>(), [] as Tier[]] as const),
+    getEmployerSummaries(employers),
+  ]);
   return {
     rows: rows.map(withoutTotal).map((r) => {
       const p = r.role === "student" ? (points.get(r.id) ?? 0) : null;
-      return { ...r, year_points: p, tier: p === null ? null : tierFromList(p, tiers) };
+      const employer = r.role === "employer" ? (companies.get(r.id) ?? { company_name: null, verified: false }) : null;
+      return { ...r, year_points: p, tier: p === null ? null : tierFromList(p, tiers), employer };
     }),
     total: rows[0] ? Number(rows[0].total_count) : 0,
   };
@@ -1200,7 +1222,7 @@ export type AdminChange<T> = { ok: true; old: T; new: T; changed: boolean } | { 
 // Both run SQL functions that check the actor is an active admin, refuse to leave zero active admins and write
 // the audit_log row in the same transaction. A role change to student without faculty / course / consent
 // fails on the student_fields check (23514).
-async function adminChange<T>(fn: "admin_set_role" | "admin_set_status", args: Record<string, unknown>): Promise<AdminChange<T>> {
+async function adminChange<T>(fn: "admin_set_role" | "admin_set_status" | "admin_set_employer_verified", args: Record<string, unknown>): Promise<AdminChange<T>> {
   const { data, error } = await getAdminClient().rpc(fn, args);
   if (!error) {
     const result = data as { old: T; new: T; changed: boolean };
@@ -1217,6 +1239,11 @@ export function setUserRole(actorId: string, targetId: string, role: Role): Prom
 
 export function setUserStatus(actorId: string, targetId: string, status: "active" | "hidden"): Promise<AdminChange<ProfileStatus>> {
   return adminChange("admin_set_status", { p_actor: actorId, p_target: targetId, p_status: status });
+}
+
+// Admins only (checked in SQL): marks an employer as verified or not, with an audit_log row.
+export function setEmployerVerified(actorId: string, targetId: string, verified: boolean): Promise<AdminChange<boolean>> {
+  return adminChange("admin_set_employer_verified", { p_actor: actorId, p_target: targetId, p_verified: verified });
 }
 
 export type AuditEntry = {
@@ -1352,4 +1379,306 @@ export function saveTier(actorId: string, oldCode: string | null, body: TierBody
 
 export function deleteTier(actorId: string, code: string, reason: string) {
   return rubricCall<null>("admin_delete_tier", { p_actor: actorId, p_code: code, p_reason: reason });
+}
+
+// -------------------------------------------------------------- employers
+// Employer onboarding, the talent directory and contact requests (migration 20261107000000). Every write goes
+// through a SQL function that checks the roles again and writes audit_log.
+
+export type EmployerProfile = {
+  company_name: string | null;
+  contact_person: string | null;
+  contact: string | null;
+  verified: boolean;
+};
+
+async function getEmployerSummaries(ids: string[]): Promise<Map<string, { company_name: string | null; verified: boolean }>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await getAdminClient()
+    .from("employer_profiles")
+    .select("profile_id, company_name, verified")
+    .in("profile_id", ids);
+  if (error) throw error;
+  return new Map((data ?? []).map((r) => [r.profile_id as string, { company_name: r.company_name, verified: r.verified === true }]));
+}
+
+export async function getEmployerProfile(profileId: string): Promise<EmployerProfile | null> {
+  const { data, error } = await getAdminClient()
+    .from("employer_profiles")
+    .select("company_name, contact_person, contact, verified")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as EmployerProfile | null;
+}
+
+// The role is fixed to 'employer' inside create_employer_profile(); nothing here can choose another one.
+export async function createEmployerProfile(userId: string, body: EmployerProfileBody): Promise<CreateProfileResult> {
+  const { error } = await getAdminClient().rpc("create_employer_profile", {
+    p_user: userId,
+    p_company: body.company_name,
+    p_person: body.contact_person,
+    p_contact: body.contact,
+    p_terms_version: body.terms_version,
+  });
+  if (!error) return { ok: true };
+  if (error.code === "23505" || (error.code === "P0001" && error.message === "profile_exists")) {
+    return { ok: false, reason: "exists" };
+  }
+  throw error;
+}
+
+export async function getOpenToWork(studentId: string): Promise<boolean> {
+  const { data, error } = await getAdminClient().from("profiles").select("open_to_work").eq("id", studentId).maybeSingle();
+  if (error) throw error;
+  return data?.open_to_work === true;
+}
+
+export type EmployerOutcome<T = null> = { ok: true; data: T } | { ok: false; code: string };
+
+async function employerCall<T>(fn: string, args: Record<string, unknown>): Promise<EmployerOutcome<T>> {
+  const { data, error } = await getAdminClient().rpc(fn, args);
+  if (!error) return { ok: true, data: data as T };
+  if (error.code === "P0001") return { ok: false, code: error.message };
+  throw error;
+}
+
+export function setOpenToWork(studentId: string, value: boolean): Promise<EmployerOutcome<boolean>> {
+  return employerCall<boolean>("set_open_to_work", { p_student: studentId, p_value: value });
+}
+
+type TalentSqlRow = {
+  student_id: string;
+  full_name: string;
+  university: string | null;
+  faculty: string | null;
+  approved_count: number;
+  tier_code: string | null;
+  tier_label: TypeName | null;
+  tier_sort: number | null;
+};
+
+// Active students who opted in, in public order (tier, then name), one page at a time. Not cached: only signed-in
+// employers and admins read it, and open_to_work changes must show at once.
+export async function listTalent(query: TalentQuery): Promise<TalentList> {
+  const { data, error } = await getAdminClient().rpc("talent_directory", {
+    p_faculty: query.faculty_id ?? null,
+    p_tier: query.tier ?? null,
+    p_category: query.category ?? null,
+  });
+  if (error) throw error;
+  const rows: TalentRow[] = ((data ?? []) as TalentSqlRow[])
+    .map((r) => ({
+      student_id: r.student_id,
+      full_name: r.full_name,
+      university: r.university,
+      faculty: r.faculty,
+      approved_count: Number(r.approved_count),
+      tier: tierOf(r),
+    }))
+    .sort(comparePublicRows);
+  const start = (query.page - 1) * TALENT_PAGE_SIZE;
+  return { rows: rows.slice(start, start + TALENT_PAGE_SIZE), total: rows.length, page: query.page, page_size: TALENT_PAGE_SIZE };
+}
+
+const COOLDOWN_DAYS = 30;
+
+type RequestSqlRow = {
+  id: string;
+  employer_id: string;
+  student_id: string;
+  message: string;
+  status: EmployerRequestState["status"];
+  shared_contact_kind: "phone" | "telegram" | "email" | null;
+  shared_contact_value: string | null;
+  created_at: string;
+  responded_at: string | null;
+};
+
+// The employer's view of a request. The contact detail is there only once the student accepted, and only while
+// the student is still active (hiding a profile is the kill switch, rule 6).
+function employerRequestState(r: RequestSqlRow, studentActive: boolean): EmployerRequestState {
+  const shared =
+    r.status === "accepted" && studentActive && r.shared_contact_kind && r.shared_contact_value
+      ? { kind: r.shared_contact_kind, value: r.shared_contact_value }
+      : null;
+  const resendAfter =
+    r.status === "declined" && r.responded_at
+      ? new Date(new Date(r.responded_at).getTime() + COOLDOWN_DAYS * 86_400_000).toISOString()
+      : null;
+  return {
+    id: r.id,
+    status: r.status,
+    created_at: r.created_at,
+    responded_at: r.responded_at,
+    resend_after: resendAfter,
+    shared_contact: shared,
+  };
+}
+
+// One student of the directory, for /talent/[studentId]: the public fields, the approved works with whether this
+// viewer may open each document, and the employer's latest request. null unless the student is active and open to work.
+export async function getTalentStudent(studentId: string, viewer: FileViewer & { kind: "user" }): Promise<TalentStudent | null> {
+  const db = getAdminClient();
+  const profile = await db
+    .from("profiles")
+    .select("id, full_name, universities(name), faculties(name)")
+    .eq("id", studentId)
+    .eq("role", "student")
+    .eq("status", "active")
+    .eq("open_to_work", true)
+    .maybeSingle<{ id: string; full_name: string; universities: { name: string } | null; faculties: { name: string } | null }>();
+  if (profile.error) throw profile.error;
+  if (!profile.data) return null;
+
+  const [board, works, request] = await Promise.all([
+    db.from("leaderboard").select("approved_count, tier_code, tier_label, tier_sort").eq("student_id", studentId).maybeSingle(),
+    db.from("public_works").select(PUBLIC_WORK_COLUMNS).eq("student_id", studentId).order("achievement_date", { ascending: false }),
+    db
+      .from("contact_requests")
+      .select("id, employer_id, student_id, message, status, shared_contact_kind, shared_contact_value, created_at, responded_at")
+      .eq("employer_id", viewer.id)
+      .eq("student_id", studentId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (board.error) throw board.error;
+  if (works.error) throw works.error;
+  if (request.error) throw request.error;
+
+  const workRows = (works.data ?? []) as PublicWork[];
+  const access = workRows.length
+    ? await db
+        .from("submissions")
+        .select("id, student_id, status, file_visibility, sensitive_data_flag")
+        .in("id", workRows.map((w) => w.submission_id))
+    : { data: [], error: null };
+  if (access.error) throw access.error;
+  const byId = new Map(
+    ((access.data ?? []) as { id: string; student_id: string; status: SubmissionStatus; file_visibility: FileVisibility; sensitive_data_flag: boolean }[]).map(
+      (a) => [a.id, a],
+    ),
+  );
+  const talentWorks: TalentWork[] = workRows.map((w) => {
+    const a = byId.get(w.submission_id);
+    return { ...w, can_view_file: a?.status === "approved" ? canViewFile(a, viewer) : false };
+  });
+
+  const b = board.data as { approved_count: number; tier_code: string | null; tier_label: TypeName | null; tier_sort: number | null } | null;
+  return {
+    student_id: profile.data.id,
+    full_name: profile.data.full_name,
+    university: profile.data.universities?.name ?? null,
+    faculty: profile.data.faculties?.name ?? null,
+    approved_count: b?.approved_count ?? 0,
+    tier: b ? tierOf(b) : null,
+    works: talentWorks,
+    request: request.data ? employerRequestState(request.data as RequestSqlRow, true) : null,
+  };
+}
+
+// Audit row for each employer view of a student profile (employer, student, time).
+export async function logEmployerProfileView(employerId: string, studentId: string, page: "talent" | "public_profile"): Promise<void> {
+  const { error } = await getAdminClient().from("audit_log").insert({
+    actor_id: employerId,
+    action: "employer.profile_viewed",
+    entity: "profile",
+    entity_id: studentId,
+    details: { page },
+  });
+  if (error) throw error;
+}
+
+export function createContactRequest(
+  employerId: string,
+  studentId: string,
+  message: string,
+  globalCap: number,
+): Promise<EmployerOutcome<string>> {
+  return employerCall<string>("create_contact_request", {
+    p_employer: employerId,
+    p_student: studentId,
+    p_message: message,
+    p_global_cap: globalCap,
+  });
+}
+
+export function respondContactRequest(studentId: string, requestId: string, body: ContactResponseBody): Promise<EmployerOutcome> {
+  return employerCall<null>("respond_contact_request", {
+    p_student: studentId,
+    p_request: requestId,
+    p_accept: body.action === "accept",
+    p_kind: body.action === "accept" ? body.kind : null,
+    p_value: body.action === "accept" ? body.value : null,
+  });
+}
+
+// The employer's sent requests, newest first.
+export async function listEmployerContactRequests(employerId: string): Promise<EmployerSentRequest[]> {
+  const { data, error } = await getAdminClient()
+    .from("contact_requests")
+    .select(
+      "id, employer_id, student_id, message, status, shared_contact_kind, shared_contact_value, created_at, responded_at, profiles!contact_requests_student_id_fkey(full_name, status)",
+    )
+    .eq("employer_id", employerId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  return ((data ?? []) as unknown as (RequestSqlRow & { profiles: { full_name: string; status: ProfileStatus } | null })[]).map((r) => {
+    const active = r.profiles?.status === "active";
+    return {
+      ...employerRequestState(r, active),
+      student_id: r.student_id,
+      full_name: active ? (r.profiles?.full_name ?? "") : "",
+      message: r.message,
+    };
+  });
+}
+
+// The student's received requests, pending first, then newest. The student sees only what kind of contact they shared.
+export async function listStudentContactRequests(studentId: string): Promise<StudentContactRequest[]> {
+  const db = getAdminClient();
+  const { data, error } = await db
+    .from("contact_requests")
+    .select("id, employer_id, message, status, shared_contact_kind, created_at, responded_at")
+    .eq("student_id", studentId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  const rows = (data ?? []) as (Omit<StudentContactRequest, "company_name" | "contact_person" | "employer_verified"> & { employer_id: string })[];
+  const employerIds = [...new Set(rows.map((r) => r.employer_id))];
+  const companies = employerIds.length
+    ? await db.from("employer_profiles").select("profile_id, company_name, contact_person, verified").in("profile_id", employerIds)
+    : { data: [], error: null };
+  if (companies.error) throw companies.error;
+  const byId = new Map((companies.data ?? []).map((c) => [c.profile_id as string, c]));
+  return rows
+    .map(({ employer_id, ...r }) => {
+      const c = byId.get(employer_id);
+      return {
+        ...r,
+        company_name: c?.company_name ?? null,
+        contact_person: c?.contact_person ?? null,
+        employer_verified: c?.verified === true,
+      };
+    })
+    .sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending") || b.created_at.localeCompare(a.created_at));
+}
+
+export async function countPendingContactRequests(studentId: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("contact_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", studentId)
+    .eq("status", "pending");
+  if (error) throw error;
+  return count ?? 0;
+}
+
+// The sign-in email, to prefill the "share email" choice. Shown only to its owner.
+export async function getAuthEmail(userId: string): Promise<string | null> {
+  const { data, error } = await getAdminClient().auth.admin.getUserById(userId);
+  if (error) throw error;
+  return data.user?.email ?? null;
 }

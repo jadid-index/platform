@@ -8,7 +8,8 @@ import { LoadingState } from "@/components/loading-state";
 import { StudentAvatar } from "@/components/student-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { academicYearLabel, format, formatDate, t, typeName } from "@/i18n";
-import { getPublicStudent } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+import { getProfileAccess, getPublicStudent, logEmployerProfileView } from "@/lib/db";
 import type { PublicStudent } from "@/lib/types";
 
 export const metadata: Metadata = { title: `${t.leaderboard.title} · ${t.common.appName}` };
@@ -39,6 +40,7 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
       return <ErrorState message={t.leaderboard.studentError} />;
     }
   }
+  if (student) await logIfEmployer(student.student_id);
   if (!student) {
     return (
       <Alert>
@@ -109,4 +111,19 @@ async function StudentLoader({ params }: { params: PageProps<"/students/[id]">["
       </section>
     </>
   );
+}
+
+// Each view of a student profile by an active employer goes to audit_log (employer, student, time).
+// A logging failure never blocks the public page.
+async function logIfEmployer(studentId: string): Promise<void> {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return;
+    const access = await getProfileAccess(user.id);
+    if (access?.role === "employer" && access.status === "active") {
+      await logEmployerProfileView(user.id, studentId, "public_profile");
+    }
+  } catch (error) {
+    console.error("log employer profile view failed", error);
+  }
 }

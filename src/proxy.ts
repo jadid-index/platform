@@ -3,9 +3,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getProfileAccess } from "@/lib/db";
 import { updateSession } from "@/lib/supabase/proxy";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/achievements", "/review", "/admin"];
+const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/achievements", "/review", "/admin", "/talent", "/offers"];
 // Admin pages and admin API: only an active admin gets through. Checked here and again in every page and handler.
 const ADMIN_PREFIXES = ["/admin", "/api/admin"];
+// Talent directory pages and API: only an active employer or admin. Also checked in every page and handler.
+const TALENT_PREFIXES = ["/talent", "/api/talent"];
 // Pages where a signed-in user's profile decides where they belong. Public pages (/, /students) are never redirected.
 const PROFILE_ROUTED_PREFIXES = [...PROTECTED_PREFIXES, "/login", "/signup"];
 
@@ -16,7 +18,8 @@ export async function proxy(request: NextRequest) {
   const { response, userId } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
-  if (matches(pathname, ADMIN_PREFIXES)) return adminGate(request, response, userId);
+  if (matches(pathname, ADMIN_PREFIXES)) return roleGate(request, response, userId, "/api/admin", ["admin"]);
+  if (matches(pathname, TALENT_PREFIXES)) return roleGate(request, response, userId, "/api/talent", ["employer", "admin"]);
 
   if (!userId) {
     return matches(pathname, PROTECTED_PREFIXES) ? redirectTo(request, response, "/login") : response;
@@ -42,18 +45,24 @@ export async function proxy(request: NextRequest) {
 }
 
 // Fails closed: if the profile lookup fails, the request is refused, unlike the other protected pages.
-async function adminGate(request: NextRequest, response: NextResponse, userId: string | null) {
-  const isApi = matches(request.nextUrl.pathname, ["/api/admin"]);
+async function roleGate(
+  request: NextRequest,
+  response: NextResponse,
+  userId: string | null,
+  apiPrefix: string,
+  roles: string[],
+) {
+  const isApi = matches(request.nextUrl.pathname, [apiPrefix]);
   if (!userId) return isApi ? deny(response, 401, "unauthorized") : redirectTo(request, response, "/login");
-  let isAdmin = false;
+  let allowed = false;
   try {
     const access = await getProfileAccess(userId);
-    isAdmin = access?.role === "admin" && access.status === "active";
+    allowed = !!access && roles.includes(access.role) && access.status === "active";
   } catch (error) {
-    console.error("proxy admin lookup failed", error);
+    console.error("proxy role lookup failed", error);
     return isApi ? deny(response, 503, "server_error") : redirectTo(request, response, "/dashboard");
   }
-  if (isAdmin) return response;
+  if (allowed) return response;
   return isApi ? deny(response, 403, "forbidden") : redirectTo(request, response, "/dashboard");
 }
 
@@ -74,5 +83,5 @@ function redirectTo(request: NextRequest, response: NextResponse, pathname: stri
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

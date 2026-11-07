@@ -1,4 +1,4 @@
-import { CheckCircle2, Plus, RotateCcw, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Handshake, Plus, RotateCcw, XCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -25,6 +25,8 @@ import { Progress } from "@/components/ui/progress";
 import { academicYearLabel, typeName, format, formatDate, t } from "@/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  countPendingContactRequests,
+  getProfileAccess,
   getCategoryProgress,
   getCurrentAcademicYear,
   getOwnStanding,
@@ -62,13 +64,19 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/da
   if (!user) redirect("/login");
 
   let profile: ProfileSummary | null;
+  let active: boolean;
   try {
-    profile = await getProfileSummary(user.id);
+    const [summary, access] = await Promise.all([getProfileSummary(user.id), getProfileAccess(user.id)]);
+    profile = summary;
+    active = access?.status === "active";
   } catch (error) {
     console.error("load profile failed", error);
     return <ErrorState />;
   }
   if (!profile) redirect("/onboarding");
+  // Employers have no submissions; their home is the talent directory. A hidden employer stays here
+  // (the /talent gate would send them back, so no redirect loop).
+  if (profile.role === "employer" && active) redirect("/talent");
   const isStudent = profile.role === "student";
 
   return (
@@ -101,13 +109,47 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/da
         ) : null}
       </aside>
 
-      <section className="grid gap-3" aria-labelledby="my-submissions">
-        <SectionHeader id="my-submissions" title={t.dashboard.mySubmissions} />
-        <Suspense fallback={<ListSkeleton rows={3} />}>
-          <SubmissionList studentId={user.id} canResubmit={isStudent} />
-        </Suspense>
-      </section>
+      <div className="grid content-start gap-6">
+        {isStudent && active ? (
+          <Suspense fallback={null}>
+            <OffersNudge studentId={user.id} />
+          </Suspense>
+        ) : null}
+        <section className="grid gap-3" aria-labelledby="my-submissions">
+          <SectionHeader id="my-submissions" title={t.dashboard.mySubmissions} />
+          <Suspense fallback={<ListSkeleton rows={3} />}>
+            <SubmissionList studentId={user.id} canResubmit={isStudent} />
+          </Suspense>
+        </section>
+      </div>
     </div>
+  );
+}
+
+// New contact requests live on /offers; a link here so a student opening the dashboard does not miss them.
+async function OffersNudge({ studentId }: { studentId: string }) {
+  let pending: number;
+  try {
+    pending = await countPendingContactRequests(studentId);
+  } catch (error) {
+    console.error("count contact requests failed", error);
+    return null;
+  }
+  if (pending === 0) return null;
+  return (
+    <Link
+      href="/offers"
+      className="flex items-center gap-3 rounded-2xl border border-primary bg-primary-soft p-4 outline-none transition-shadow hover:shadow-card focus-visible:ring-[3px] focus-visible:ring-ring/50"
+    >
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-contrast">
+        <Handshake className="size-5" aria-hidden />
+      </span>
+      <span className="grid flex-1 gap-0.5">
+        <span className="font-semibold">{format(t.offers.nudge, { n: pending })}</span>
+        <span className="text-small text-primary-text">{t.offers.nudgeAction}</span>
+      </span>
+      <ArrowRight className="size-5 shrink-0" aria-hidden />
+    </Link>
   );
 }
 

@@ -190,3 +190,58 @@ export type TopTier = {
   rows: LeaderboardRow[];
   total: number; // everyone in that tier
 };
+
+// ------------------------------------------------------------------ employers
+
+// One row of the talent directory (/talent). Same public fields as the leaderboard: never points, rank or contacts.
+export type TalentRow = {
+  student_id: string;
+  full_name: string;
+  university: string | null;
+  faculty: string | null;
+  approved_count: number;
+  tier: PublicTier | null; // all-time: the best academic year
+};
+
+export type TalentList = { rows: TalentRow[]; total: number; page: number; page_size: number };
+
+// A work in the directory: the public metadata plus whether this viewer may open the document (canViewFile()).
+export type TalentWork = PublicWork & { can_view_file: boolean };
+
+export type ContactRequestStatus = "pending" | "accepted" | "declined";
+
+// What the employer knows about its own request. shared_contact is set only after the student accepted
+// (and only while the student is active).
+export type EmployerRequestState = {
+  id: string;
+  status: ContactRequestStatus;
+  created_at: string;
+  responded_at: string | null;
+  resend_after: string | null; // declined: the day a new request is allowed
+  shared_contact: { kind: "phone" | "telegram" | "email"; value: string } | null;
+};
+
+export type TalentStudent = Omit<TalentRow, "approved_count"> & {
+  approved_count: number;
+  works: TalentWork[];
+  request: EmployerRequestState | null; // the latest request of this employer, if any
+};
+
+export type EmployerSentRequest = EmployerRequestState & {
+  student_id: string;
+  full_name: string;
+  message: string;
+};
+
+// What the student sees: who asks (company, contact person, verified mark) and the message.
+export type StudentContactRequest = {
+  id: string;
+  status: ContactRequestStatus;
+  message: string;
+  created_at: string;
+  responded_at: string | null;
+  company_name: string | null;
+  contact_person: string | null;
+  employer_verified: boolean;
+  shared_contact_kind: "phone" | "telegram" | "email" | null;
+};

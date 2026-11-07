@@ -7,6 +7,7 @@ import { NavLinkView, type NavLinkProps } from "./nav-link-view";
 // The leaderboard link is also active on public profiles (they are opened from the leaderboard).
 function isActive(pathname: string, href: string): boolean {
   if (href === "/leaderboard" && pathname.startsWith("/students/")) return true;
+  if (href === "/talent" && pathname.startsWith("/talent/requests")) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

@@ -16,14 +16,15 @@ const ERRORS: Record<string, [number, string]> = {
 };
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/review/submissions/[id]/sensitive">) {
-  const id = z.uuid().safeParse((await ctx.params).id);
-  if (!id.success) return apiError(404, "not_found");
-  const body = sensitiveBodySchema.safeParse(await readJson(request));
-  if (!body.success) return apiError(400, "invalid_body");
-
   try {
     const auth = await requireReviewer();
     if (!auth.ok) return apiError(auth.status, auth.error);
+
+    const id = z.uuid().safeParse((await ctx.params).id);
+    if (!id.success) return apiError(404, "not_found");
+    const body = sensitiveBodySchema.safeParse(await readJson(request));
+    if (!body.success) return apiError(400, "invalid_body");
+
     const outcome = await setSensitiveFlag(auth.userId, id.data, body.data.flag);
     if (!outcome.ok) {
       const [status, code] = ERRORS[outcome.message] ?? [409, "conflict"];

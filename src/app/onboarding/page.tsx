@@ -16,19 +16,23 @@ import { OnboardingForm } from "./onboarding-form";
 
 export const metadata: Metadata = { title: `${t.onboarding.title} · ${t.common.appName}` };
 
-export default function OnboardingPage() {
+export default function OnboardingPage({ searchParams }: PageProps<"/onboarding">) {
   return (
     <AuthCard title={t.onboarding.title} description={t.onboarding.subtitle}>
       <Suspense fallback={<LoadingState />}>
-        <OnboardingLoader />
+        <OnboardingLoader searchParams={searchParams} />
       </Suspense>
     </AuthCard>
   );
 }
 
-async function OnboardingLoader() {
+async function OnboardingLoader({ searchParams }: { searchParams: PageProps<"/onboarding">["searchParams"] }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  // ?as=employer (or signup_as in metadata) only preselects the choice; the role itself is decided by the submitted
+  // form and checked by POST /api/profile, never by this parameter or by user metadata.
+  const asked = (await searchParams).as ?? user.user_metadata.signup_as;
+  const initialType = asked === "employer" ? "employer" : "student";
 
   let universities: University[];
   let hasProfile: boolean;
@@ -43,7 +47,13 @@ async function OnboardingLoader() {
   }
   if (hasProfile) redirect("/dashboard");
 
-  return <OnboardingForm universities={universities} initial={valuesFromMetadata(user.user_metadata)} />;
+  return (
+    <OnboardingForm
+      universities={universities}
+      initial={valuesFromMetadata(user.user_metadata)}
+      initialType={initialType}
+    />
+  );
 }
 
 // Prefill from what the student entered at sign-up. User metadata is user-controlled, so it is

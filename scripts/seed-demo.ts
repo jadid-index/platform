@@ -9,11 +9,12 @@
 // Approvals go straight to approve_submission(), not through the app, so a running app shows them on the
 // leaderboard after its cache refreshes (about 30 seconds).
 
-import { approveSubmission, rejectSubmission } from "@/lib/db";
+import { approveSubmission, rejectSubmission, setOpenToWork } from "@/lib/db";
 import { todayInTashkent } from "@/lib/validation";
 
 import {
   cleanTestData,
+  createTestEmployer,
   createTestReviewer,
   createTestStudent,
   fields,
@@ -104,6 +105,11 @@ async function seed() {
       console.log(`pending   ${title} (${date})`);
     }
   }
+  // Talent directory: every other student is open to work; one unverified employer to try it with.
+  for (const [i, student] of students.entries()) if (i % 2 === 0) await setOpenToWork(student.id, true);
+  const employer = await createTestEmployer("employer", "Sinov Ish Beruvchi", false);
+  console.log(`employer  ${employer.email}  password: ${employer.password}`);
+
   console.log("done. Remove with: npm run seed:demo -- --clean");
 }
 

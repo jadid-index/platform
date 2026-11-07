@@ -38,11 +38,16 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    'public' anyone (set by the owner only after the confirmation dialog, `public_confirmed_at`), 'verified' employers
    with `employer_profiles.verified = true` (default), 'private' nobody else. A reviewer's `sensitive_data_flag` forces
    private for good. Changes go only through `set_file_visibility()` / `set_sensitive_flag()` (they write `audit_log`).
-5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v2) promises:
+5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v3) promises:
    name, university, faculty, tier (never points, rule 11), the number of approved works, and for each approved work
    its title, type, issuer, date, level, result, certificate reference and a verified mark, plus the profile photo
    if the student uploaded one, plus the document only as rule 4 allows. Never the email, course or exact points.
    Do not add anything else to public views; if you must, change the notice and bump its version first.
+   The talent directory (`/talent`, signed-in employers and admins only) shows the same public fields, only for
+   students who switched on `profiles.open_to_work`. A student's contact detail reaches an employer only when the
+   student accepts that employer's contact request and picks which one to share (phone, Telegram or email); it is
+   stored on that request only, shown only while the student is active, and never written to `audit_log`.
+   Each employer view of a student profile is logged (`employer.profile_viewed`).
    Google sign-in must not import a profile photo (no avatar_url), and the name from Google is only a
    suggestion that the student confirms, because it is shown publicly.
 6. **Pilot sign-up is open: any email address, no email verification** (team decision, 24 Oct, temporary).
@@ -55,7 +60,13 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 8. **Never commit secrets.** `.env*` stays in `.gitignore`; keep `.env.example` with variable names only.
 9. **Never send student profile data to the AI model.** `/api/extract` sends the document and the prompt only.
 10. **Roles are student, reviewer, employer, admin.** A role is only ever set by an admin or by onboarding (student or employer only).
-   Every /admin route and every role-based action is checked on the server.
+   `POST /api/profile` is strict: only `role: "student" | "employer"`, no extra keys; a role in user metadata is ignored.
+   Every /admin route and every role-based action is checked on the server. Student routes (`requireActiveStudent()`)
+   refuse employers; employer routes (`requireEmployer()`, `/talent` via `requireTalentViewer()`) refuse students and
+   reviewers. `tests/employers.test.ts` scans the route folders for this.
+   Employers need no verification to sign up (rule 6). Admins set `employer_profiles.verified` on `/admin/users`
+   (`admin_set_employer_verified()`, audit row); verified employers get 30 instead of 10 contact requests a day and
+   open 'verified' documents. `CONTACT_REQUESTS_DAILY_CAP` (default 300) caps requests across all employers.
    Role and status changes go only through `admin_set_role()` / `admin_set_status()` (they protect the last admin
    and write `audit_log`). The first admin is created by SQL (`docs/SPEC.md` section 3a); there is no self-promotion.
 11. **Public views and public APIs never return points or rank numbers; they return tiers.**
@@ -138,8 +149,10 @@ do not regenerate or re-run the seed against a live database, and never edit poi
   account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (an admin promotes them on `/admin/users`; the first admin is created by SQL).
-- Consent v2 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) are drafts (`draft: true`, shown as
-  such) until the team's text arrives in `docs/consent-v2.md`. Do not launch with the drafts.
-- Employer verification: `employer_profiles.verified` exists, but there is no admin UI yet and nobody is verified.
+- Consent v3 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) and the employer terms
+  (`t.employerTerms`, `employer-v1`) are drafts (`draft: true`, shown as such) until the team's text arrives in
+  `docs/consent-v2.md`. The landing page's "For employers" copy (`t.home.employers`) is a placeholder. Do not launch with the drafts.
+- Employer verification is a manual admin switch on `/admin/users`; what an admin should check before switching it on
+  is not decided yet.
 - Tier thresholds are placeholders (based on 4 categories x 100 = 400 points per year).
-- Employer onboarding and what employers can see (the role exists; no employer screens yet).
+- An employer made by an admin (role change) has no company details and no screen to add them; it cannot send requests.

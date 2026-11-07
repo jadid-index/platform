@@ -17,17 +17,18 @@ const ERRORS: Record<string, [number, string]> = {
 };
 
 export async function PATCH(request: Request, ctx: RouteContext<"/api/submissions/[id]/visibility">) {
-  const id = z.uuid().safeParse((await ctx.params).id);
-  if (!id.success) return apiError(404, "not_found");
-  const body = visibilityBodySchema.safeParse(await readJson(request));
-  if (!body.success) {
-    const needsConfirm = body.error.issues.some((i) => i.path[0] === "confirm");
-    return apiError(400, needsConfirm ? "confirmation_required" : "invalid_body");
-  }
-
   try {
     const auth = await requireActiveStudent();
     if (!auth.ok) return apiError(auth.status, auth.error);
+
+    const id = z.uuid().safeParse((await ctx.params).id);
+    if (!id.success) return apiError(404, "not_found");
+    const body = visibilityBodySchema.safeParse(await readJson(request));
+    if (!body.success) {
+      const needsConfirm = body.error.issues.some((i) => i.path[0] === "confirm");
+      return apiError(400, needsConfirm ? "confirmation_required" : "invalid_body");
+    }
+
     const outcome = await setFileVisibility(auth.userId, id.data, body.data.visibility, body.data.confirm === true);
     if (!outcome.ok) {
       const [status, code] = ERRORS[outcome.message] ?? [409, "conflict"];

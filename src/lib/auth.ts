@@ -53,3 +53,30 @@ export async function requireAdmin(): Promise<
   }
   return { ok: true, userId: user.id };
 }
+
+// For employer-only route handlers (sending contact requests, the sent list): role employer and an active profile.
+// Students, reviewers and admins get 403 (CLAUDE.md rule 10).
+export async function requireEmployer(): Promise<
+  { ok: true; userId: string } | { ok: false; status: 401 | 403; error: string }
+> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, status: 401, error: "unauthorized" };
+  const access = await getProfileAccess(user.id);
+  if (!access || access.status !== "active" || access.role !== "employer") {
+    return { ok: false, status: 403, error: "forbidden" };
+  }
+  return { ok: true, userId: user.id };
+}
+
+// For the talent directory (/talent, GET /api/talent): an active employer or an active admin.
+export async function requireTalentViewer(): Promise<
+  { ok: true; userId: string; role: "employer" | "admin" } | { ok: false; status: 401 | 403; error: string }
+> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, status: 401, error: "unauthorized" };
+  const access = await getProfileAccess(user.id);
+  if (!access || access.status !== "active" || (access.role !== "employer" && access.role !== "admin")) {
+    return { ok: false, status: 403, error: "forbidden" };
+  }
+  return { ok: true, userId: user.id, role: access.role };
+}

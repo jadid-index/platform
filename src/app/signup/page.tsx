@@ -14,18 +14,20 @@ import { SignupForm } from "./signup-form";
 
 export const metadata: Metadata = { title: `${t.signup.title} · ${t.common.appName}` };
 
-export default function SignupPage() {
+export default function SignupPage({ searchParams }: PageProps<"/signup">) {
   return (
     <AuthCard title={t.signup.title} description={t.signup.subtitle}>
       <Suspense fallback={<LoadingState />}>
-        <SignupLoader />
+        <SignupLoader searchParams={searchParams} />
       </Suspense>
     </AuthCard>
   );
 }
 
-async function SignupLoader() {
+async function SignupLoader({ searchParams }: { searchParams: PageProps<"/signup">["searchParams"] }) {
   await connection();
+  // ?as=employer (the landing page's employer link) only preselects the choice.
+  const initialType = (await searchParams).as === "employer" ? "employer" : "student";
 
   let universities: University[];
   try {
@@ -43,5 +45,5 @@ async function SignupLoader() {
     );
   }
 
-  return <SignupForm universities={universities} />;
+  return <SignupForm universities={universities} initialType={initialType} />;
 }
