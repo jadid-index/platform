@@ -440,7 +440,7 @@ export const uz = {
       { title: "Ish beruvchi soʻrov yuboradi", text: "Kompaniya nomi, xodim ismi va xabari shu sahifaga keladi." },
       { title: "Siz tanlaysiz", text: "Qabul qilsangiz, telefon, Telegram yoki e-pochtadan bittasini oʻzingiz ulashasiz." },
     ],
-    requestsDescription: "E-pochta xabari yuborilmaydi: yangi soʻrovlarni shu yerda kuzating.",
+    requestsDescription: "E-pochta xabari hozircha yuborilmaydi: yangi soʻrovlarni shu yerda kuzating.",
     groupNew: "Yangi soʻrovlar",
     groupAnswered: "Javob berilganlar",
     emptyHintOff: "Avval «Ishga tayyorman»ni yoqing, shunda ish beruvchilar sizni topa oladi.",
