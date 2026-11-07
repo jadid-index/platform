@@ -54,7 +54,6 @@ export function AccountMenu({ name }: { name: string | null }) {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <ThemeMenuItems />
-        <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={pending}
           onSelect={(event) => {

@@ -46,7 +46,7 @@ export const uz = {
   },
   theme: {
     label: "Mavzu",
-    names: { mint: "Yalpiz", pastel: "Pastel" } as Record<string, string>,
+    names: { mint: "Yalpiz" } as Record<string, string>,
   },
   home: {
     tagline: "Talabalar yutuqlari reytingi",

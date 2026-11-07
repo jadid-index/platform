@@ -2,11 +2,12 @@
 // Adding a theme: a CSS block, an entry here, a label. No component changes.
 export const THEMES = [
   { id: "mint" },
-  { id: "pastel" },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 export const DEFAULT_THEME: ThemeId = "mint";
+// The switcher only shows when there is a choice to make.
+export const HAS_THEME_CHOICE = (THEMES as readonly { id: string }[]).length > 1;
 export const THEME_COOKIE = "jadid-theme";
 export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 

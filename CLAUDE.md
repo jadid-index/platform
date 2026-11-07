@@ -78,8 +78,8 @@ do not regenerate or re-run the seed against a live database, and never edit poi
     Text on #EFFFFB is #272727. Fills of #50D890 or #4F98CA carry #272727 text, never white. Never use #50D890 or
     #4F98CA as text on light surfaces; small green or blue text and links use the derived `primary-text` / `accent-text`
     (same hues, darker, 4.5:1 or more). On #272727 surfaces #50D890 and #4F98CA may be text.
-  - "pastel": the original soft sage theme, kept as the second option.
-  - The viewer picks a theme in the top bar or the profile menu; it is saved in the `jadid-theme` cookie and applied
+  - "mint" is currently the only theme; the switcher (top bar, profile menu, mobile sheet) is hidden while
+    `THEMES` has one entry. The viewer picks a theme there; it is saved in the `jadid-theme` cookie and applied
     before first paint by the script in the root layout (unknown or missing value: mint).
   - `npm run check:contrast` (also part of `npm test`) checks every text, button and border token pair in every theme
     against WCAG AA (4.5:1 text, 3:1 large text and UI borders) and fails on raw colors in components. It must pass.

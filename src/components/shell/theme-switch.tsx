@@ -10,10 +10,19 @@ import {
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { t } from "@/i18n";
-import { DEFAULT_THEME, parseTheme, THEME_COOKIE, THEME_COOKIE_MAX_AGE, THEMES, type ThemeId } from "@/lib/themes";
+import {
+  DEFAULT_THEME,
+  HAS_THEME_CHOICE,
+  parseTheme,
+  THEME_COOKIE,
+  THEME_COOKIE_MAX_AGE,
+  THEMES,
+  type ThemeId,
+} from "@/lib/themes";
 import { cn } from "@/lib/utils";
 
 // The theme lives on <html data-theme> (set before paint by THEME_BOOT_SCRIPT) and in the jadid-theme cookie.
@@ -48,8 +57,10 @@ function Swatch({ id }: { id: ThemeId }) {
 const name = (id: ThemeId) => t.theme.names[id] ?? id;
 
 // Radio items for use inside another dropdown (the profile menu).
+// Includes its own trailing separator so the menu has no empty gap when there is only one theme.
 export function ThemeMenuItems() {
   const [theme, setTheme] = useTheme();
+  if (!HAS_THEME_CHOICE) return null;
   return (
     <>
       <DropdownMenuLabel>{t.theme.label}</DropdownMenuLabel>
@@ -61,12 +72,14 @@ export function ThemeMenuItems() {
           </DropdownMenuRadioItem>
         ))}
       </DropdownMenuRadioGroup>
+      <DropdownMenuSeparator />
     </>
   );
 }
 
 // Icon button with a dropdown, for the top bar.
 export function ThemeSwitch({ className }: { className?: string }) {
+  if (!HAS_THEME_CHOICE) return null;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -84,6 +97,7 @@ export function ThemeSwitch({ className }: { className?: string }) {
 // Segmented choice for the mobile menu sheet: every option shows its swatch and name.
 export function ThemeChoices() {
   const [theme, setTheme] = useTheme();
+  if (!HAS_THEME_CHOICE) return null;
   return (
     <fieldset className="grid gap-2">
       <legend className="mb-2 text-small font-semibold">{t.theme.label}</legend>
