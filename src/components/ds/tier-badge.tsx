@@ -16,11 +16,11 @@ const TONES = [
 
 const SIZES = {
   sm: "h-7 min-w-9 px-1.5 text-small",
-  md: "h-full min-w-11 text-h2",
+  md: "h-full min-w-11 px-1.5 text-h2",
   lg: "h-14 min-w-16 px-3 text-h2",
 } as const;
 
-// The tier letter is always visible; the color only supports it. No tier: a dashed "–".
+// The tier letter is always visible, in its own font (font-tier) for now; the color only supports it. No tier: a dashed "–".
 export function TierBadge({
   tier,
   size = "md",
@@ -37,7 +37,7 @@ export function TierBadge({
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-extrabold tracking-tight ring-1 ring-text/10 ring-inset",
+        "inline-flex shrink-0 items-center justify-center rounded-full font-tier font-extrabold tracking-tight ring-1 ring-text/10 ring-inset",
         SIZES[size],
         tier ? TONES[Math.min(tier.sort_order, TONES.length) - 1] : "border border-dashed text-muted-foreground",
         className,

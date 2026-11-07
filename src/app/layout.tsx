@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Onest } from "next/font/google";
+import { Onest, Unbounded } from "next/font/google";
 
 import { AppShell } from "@/components/shell/app-shell";
 import { locale, t } from "@/i18n";
@@ -11,6 +11,14 @@ import "./globals.css";
 // Russian Cyrillic and Uzbek Cyrillic (Ўў Ққ Ғғ Ҳҳ, in cyrillic-ext). Manrope lacks U+02BB, so it was not used.
 const onest = Onest({
   variable: "--font-onest",
+  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
+});
+
+// Unbounded: tier badge codes only (font-tier), so tiers stand apart from the text until they get their own icons.
+// Has Latin and Cyrillic, because admins can rename tier codes on /admin/rubric.
+const unbounded = Unbounded({
+  variable: "--font-unbounded",
+  weight: ["800"],
   subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
 });
 
@@ -29,7 +37,7 @@ export const viewport: Viewport = {
 // with an unknown value the default theme (:root) shows. suppressHydrationWarning: the script sets data-theme.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang={locale} className={`${onest.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang={locale} className={`${onest.variable} ${unbounded.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>

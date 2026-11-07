@@ -84,7 +84,8 @@ do not regenerate or re-run the seed against a live database, and never edit poi
   - `npm run check:contrast` (also part of `npm test`) checks every text, button and border token pair in every theme
     against WCAG AA (4.5:1 text, 3:1 large text and UI borders) and fails on raw colors in components. It must pass.
   - Every status shows a label or icon and every tier its letter, never color alone.
-- Font: Onest (one family, next/font), 400 body and 800 headings. It covers Uzbek Latin (oʻ, gʻ with U+02BB, ʼ U+02BC),
+- Font: Onest (next/font), 400 body and 800 headings. Tier badge codes only use Unbounded 800 (`font-tier`), a
+  placeholder until tiers get icons. It covers Uzbek Latin (oʻ, gʻ with U+02BB, ʼ U+02BC),
   Russian and Uzbek Cyrillic; check these glyphs before switching fonts.
 - Top floating pill navigation. No sidebar, except the secondary navigation inside /admin.
   The pill shows the links the viewer's role may open; below lg it shrinks to logo plus a menu button that opens a
