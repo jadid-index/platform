@@ -1,3 +1,4 @@
+import { FileUser } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -67,6 +68,15 @@ async function StudentLoader({ params }: { params: PageProps<"/talent/[studentId
             <h1 className="text-h2 break-words">{student.full_name}</h1>
             <p className="text-sm text-muted-foreground">{[student.faculty, student.university].filter(Boolean).join(" · ")}</p>
             <p className="text-sm text-muted-foreground">{format(t.talent.works, { n: student.approved_count })}</p>
+            {student.cv_available ? (
+              <Link
+                href={`/cv/${student.student_id}`}
+                className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+              >
+                <FileUser className="size-4" aria-hidden />
+                {t.talent.openCv}
+              </Link>
+            ) : null}
           </div>
         </CardContent>
       </Card>

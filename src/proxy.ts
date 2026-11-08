@@ -4,12 +4,17 @@ import { getProfileAccess } from "@/lib/db";
 import { updateSession } from "@/lib/supabase/proxy";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/onboarding", "/achievements", "/review", "/admin", "/talent", "/offers"];
+// Protected as an exact path only: /cv is the student's editor, while /cv/<id> (a CV view) is open to anyone
+// and the page decides with cvAccess() who sees what.
+const PROTECTED_EXACT = ["/cv"];
 // Admin pages and admin API: only an active admin gets through. Checked here and again in every page and handler.
 const ADMIN_PREFIXES = ["/admin", "/api/admin"];
 // Talent directory pages and API: only an active employer or admin. Also checked in every page and handler.
 const TALENT_PREFIXES = ["/talent", "/api/talent"];
 // Pages where a signed-in user's profile decides where they belong. Public pages (/, /students) are never redirected.
 const PROFILE_ROUTED_PREFIXES = [...PROTECTED_PREFIXES, "/login", "/signup"];
+
+const isProtected = (pathname: string) => matches(pathname, PROTECTED_PREFIXES) || PROTECTED_EXACT.includes(pathname);
 
 const matches = (pathname: string, prefixes: string[]) =>
   prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -22,9 +27,9 @@ export async function proxy(request: NextRequest) {
   if (matches(pathname, TALENT_PREFIXES)) return roleGate(request, response, userId, "/api/talent", ["employer", "admin"]);
 
   if (!userId) {
-    return matches(pathname, PROTECTED_PREFIXES) ? redirectTo(request, response, "/login") : response;
+    return isProtected(pathname) ? redirectTo(request, response, "/login") : response;
   }
-  if (!matches(pathname, PROFILE_ROUTED_PREFIXES)) return response;
+  if (!matches(pathname, PROFILE_ROUTED_PREFIXES) && !PROTECTED_EXACT.includes(pathname)) return response;
 
   // Signed in: no profile yet (for example a new Google user) -> onboarding; profile exists -> away from
   // onboarding and the auth pages. Pages and route handlers still check access themselves; if this lookup

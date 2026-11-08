@@ -1,3 +1,4 @@
+import { FileUser } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -7,7 +8,8 @@ import { checkTalentPage } from "@/components/talent-gate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { format, t, typeName } from "@/i18n";
-import { listTalent, listTiers, listUniversitiesWithFaculties } from "@/lib/db";
+import { listTiers, listUniversitiesWithFaculties } from "@/lib/db";
+import { loadTalentList } from "@/lib/talent";
 import type { TalentList } from "@/lib/types";
 import { talentQuerySchema, type TalentQuery } from "@/lib/validation";
 
@@ -46,7 +48,7 @@ async function Talent({ searchParams }: { searchParams: PageProps<"/talent">["se
   let faculties: { value: string; label: string }[];
   let tiers: { value: string; label: string }[];
   try {
-    const [l, universities, tierRows] = await Promise.all([listTalent(query), listUniversitiesWithFaculties(), listTiers()]);
+    const [l, universities, tierRows] = await Promise.all([loadTalentList(viewer, query), listUniversitiesWithFaculties(), listTiers()]);
     list = l;
     faculties = universities.flatMap((u) => u.faculties.map((f) => ({ value: String(f.id), label: f.name })));
     tiers = tierRows.map((x) => ({ value: x.code, label: typeName(x.label) }));
@@ -96,6 +98,15 @@ async function Talent({ searchParams }: { searchParams: PageProps<"/talent">["se
                       {[r.faculty, r.university].filter(Boolean).join(" · ")}
                     </p>
                     <p className="text-small text-muted-foreground">{format(t.talent.works, { n: r.approved_count })}</p>
+                    {r.cv_available ? (
+                      <Link
+                        href={`/cv/${r.student_id}`}
+                        className="inline-flex w-fit items-center gap-1.5 text-small font-medium text-primary-text underline-offset-4 hover:underline"
+                      >
+                        <FileUser className="size-4" aria-hidden />
+                        {t.talent.openCv}
+                      </Link>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>

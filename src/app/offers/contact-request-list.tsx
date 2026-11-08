@@ -222,6 +222,8 @@ function RequestCard({ request: r, accountEmail }: { request: StudentContactRequ
             <DialogDescription>{t.contactRequests.acceptHint}</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
+            {/* Rule 12: an accepted employer can always open the CV, with its contact fields. */}
+            <p className="rounded-lg border bg-surface-sunken p-3 text-small">{t.contactRequests.acceptCvNote}</p>
             <fieldset className="grid gap-2">
               <legend className="mb-1 text-sm font-medium">{t.contactRequests.kindLabel}</legend>
               <RadioGroup value={kind} onValueChange={(v) => chooseKind(v as ContactKind)} className="gap-2" disabled={saving}>

@@ -10,7 +10,7 @@ export function NavLinksFallback({ layout }: { layout: NavLayout }) {
 }
 
 // The links the viewer's role may open. Display only: every page and API route checks access on the server.
-// Home is the logo. Students get /offers, which carries the new-request badge. Employers get the talent directory
+// Home is the logo. Students get /offers, which carries the new-request badge, and their CV editor (/cv). Employers get the talent directory
 // and their sent requests; admins also see the directory.
 export async function NavLinks({ layout }: { layout: NavLayout }) {
   const viewer = await getShellViewer();
@@ -38,6 +38,7 @@ export async function NavLinks({ layout }: { layout: NavLayout }) {
             count={pending}
             countLabel={format(t.nav.newRequests, { n: pending })}
           />
+          <NavItem href="/cv" label={t.nav.cv} icon="cv" layout={layout} />
         </>
       ) : null}
       {isEmployer || isAdmin ? <NavItem href="/talent" label={t.nav.talent} icon="talent" layout={layout} /> : null}

@@ -39,9 +39,13 @@ routes refuse students and reviewers (rule 10).
 | GET | `/api/leaderboard` | public | Query: `university_id, faculty_id, academic_year, limit, offset`. Default is the current academic year (`leaderboard_by_year`); pass `academic_year=all` for the all-time view `leaderboard`. The response includes `available_years` for the year tabs. Rows: `student_id, full_name, university, faculty, photo_url, approved_count, tier {code, label, sort_order} \| null`, ordered by tier (best first) then name. No points, rank or approval time. |
 | GET | `/api/leaderboard/:studentId` | public | Name, faculty, `tier` (best academic year), `current_year.tier`, `approved_count`, and approved works (`submission_id`, title, type, issuer, level, result, date, `certificate_ref`, `file_public`). No points, never a file path or URL. |
 | PATCH | `/api/me/open-to-work` | student | Body `{ open_to_work }`. Calls `set_open_to_work()`. |
+| GET | `/api/me/cv` | student | Own CV: `doc` (editable), `visibility`, `public_confirmed_at`, `updated_at`, `view` (full preview). `no-store`, `noindex`. |
+| PUT | `/api/me/cv` | student | Body: the whole CV (strict, section 3f). Calls `save_cv()`. 400 `invalid_body` / `invalid_cv`, 429 `rate_limited` (60 writes an hour, shared with visibility). |
+| PATCH | `/api/me/cv/visibility` | student | Body `{ visibility: "private" \| "verified" \| "public", confirm?: true }`; public needs `confirm`. Calls `set_cv_visibility()`. 400 `confirmation_required`, 429 `rate_limited`. |
+| GET | `/api/cv/:studentId` | any | One CV as the caller may see it (`cvAccess()`, section 3f). Contacts and course left out unless allowed. 404 `not_found` for everyone not allowed (same as no CV). Employer and admin views logged. `no-store`, `X-Robots-Tag: noindex`. |
 | GET | `/api/me/contact-requests` | student | Received requests (company, contact person, verified mark, message, status), pending first, plus `pending` count. |
 | PATCH | `/api/me/contact-requests/:id` | student (owner) | Body `{ action: "decline" }` or `{ action: "accept", kind: "phone" \| "telegram" \| "email", value }`. Calls `respond_contact_request()`. 404 `not_found`, 409 `already_answered`. |
-| GET | `/api/talent` | E or A | Query: `faculty_id, tier, category, page` (20 per page). Active students with `open_to_work`, in public order. Rows: `student_id, full_name, university, faculty, approved_count, tier`. No points, rank or contact. `no-store`. |
+| GET | `/api/talent` | E or A | Query: `faculty_id, tier, category, page` (20 per page). Active students with `open_to_work`, in public order. Rows: `student_id, full_name, university, faculty, approved_count, tier, cv_available` (a boolean: this viewer may open the CV). No points, rank or contact. `no-store`. |
 | GET | `/api/talent/:studentId` | E or A | One open-to-work student: the same fields, approved works with `can_view_file` (rule 4) and the employer's latest request (`shared_contact` only after acceptance). Employer views are logged. 404 otherwise. |
 | GET | `/api/talent/requests` | E | The employer's sent requests. `shared_contact` only for accepted requests of active students. |
 | POST | `/api/talent/requests` | E | Body `{ student_id, message (1-500) }`. Calls `create_contact_request()`. 409 `duplicate_pending` / `already_accepted` / `declined_cooldown`, 429 `rate_limited` / `rate_limited_global`, 404 `student_not_available`, 403 `employer_profile_missing`. |
@@ -227,6 +231,48 @@ After that, further admins and reviewers are promoted on `/admin/users`.
   (actor employer, entity_id student, `details.page` = `talent` or `public_profile`; each view, admins are not logged),
   `contact_request.created`, `contact_request.accepted {kind}`, `contact_request.declined`, `profile.open_to_work`.
 - Consent v3 adds a paragraph about the directory and contact requests; the privacy policy has an "Employers" section.
+
+## 3f. CV (migration `20261108000000`, CLAUDE.md rule 12)
+
+- `student_cvs (student_id pk, about <= 600, skills jsonb, languages jsonb, experience jsonb, links jsonb,
+  contact_phone, contact_email, contact_telegram, contact_city, cv_visibility private | verified | public (default
+  private), cv_public_confirmed_at, write_window_start, write_count, created_at, updated_at)`. One row per student,
+  created on the first save. Education (university, faculty, course) and the verified achievements are read from
+  `profiles` / `public_works` at view time, never copied. No photo.
+- Limits (zod `cvBodySchema` and SQL `cv_content_valid()` plus column checks; lengths in code points): skills <= 20,
+  each 1-40, no duplicates (case-insensitive); languages <= 8, `{name 1-40, level A1..C2 | native}`; experience <= 10,
+  `{title 1-120, organization 1-120, start YYYY-MM, end YYYY-MM | null (= present), description 0-300}`, end not
+  before start, neither after the current month (Tashkent); links <= 5, `{label 1-40, url}` with https only, no
+  `user:password@`, a dotted host, <= 300; contacts optional (phone like `PHONE_RE`, email, Telegram `@name`, city
+  2-80). No control characters or bidi overrides; newlines only in about and descriptions.
+- `save_cv(student, doc)`: active students only, exactly the nine keys, upsert. `set_cv_visibility(student, v,
+  confirm)`: public needs `confirm` and sets `cv_public_confirmed_at`; any other value clears it. Both count toward
+  60 writes per student per hour (`rate_limited`). Errors: `invalid_cv`, `confirmation_required`, `not_active_student`.
+- Who may open a CV (`cvAccess()` in `src/lib/cv-access.ts`; "full" = with contacts and course):
+
+| Viewer | private | verified | public |
+|---|---|---|---|
+| owner (any status) | full | full | full |
+| active admin (logged) | full | full | full |
+| employer with an accepted request from the student (logged) | full | full | full |
+| verified employer (logged) | 404 | no contacts | no contacts |
+| unverified employer (logged) | 404 | 404 | public view |
+| anyone else, signed out too | 404 | 404 | public view |
+
+  "Public view" = name, university, faculty, tier, the self-declared sections and the verified achievements; never
+  the contacts or the course (rule 5). A student who is not active: 404 for everyone except the owner and admins.
+  A student who never saved a CV: 404 for everyone but the owner. The server leaves out what a viewer may not see;
+  nothing is sent and then hidden.
+- Pages: `/cv` (student editor; proxy-protected as an exact path), `/cv/:id` (view) and `/cv/:id/print` (A4 sheet,
+  no navigation, the browser's "Save as PDF"). All `noindex`, never cached. One disclaimer line at the top says the
+  typed sections are self-declared and unchecked (no per-section labels); "Tasdiqlangan yutuqlar" lists approved works (title, issuer, date, level, result, verified
+  badge), no points or rank. Links render only if still valid https, with `rel="noopener noreferrer nofollow"`.
+- `/talent` and `/talent/:id` show "Open CV" only when `cv_available`. No CV data in any listing or public route.
+  The accept dialog on `/offers` says the employer will also see the CV with its contacts.
+- Audit: `cv.updated {sections}` (names only, never text or contacts), `cv.visibility {old,new,confirmed_at}`,
+  `employer.cv_viewed {page}` and `admin.cv_viewed {page}` (entity_id = student, every view). CVs are never sent to
+  the AI model.
+- Consent v4 adds a CV paragraph (draft); the privacy policy has a "Rezyume" section.
 
 ## 4. AI extraction (`POST /api/extract`)
 

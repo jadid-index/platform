@@ -2,6 +2,7 @@ import {
   Award,
   BriefcaseBusiness,
   ClipboardCheck,
+  FileUser,
   Handshake,
   Send,
   ShieldCheck,
@@ -22,6 +23,7 @@ const ICONS = {
   talent: BriefcaseBusiness,
   requests: Send,
   offers: Handshake,
+  cv: FileUser,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIcon = keyof typeof ICONS;

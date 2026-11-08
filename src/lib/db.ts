@@ -31,10 +31,17 @@ import type {
   EmployerRequestState,
   EmployerSentRequest,
   StudentContactRequest,
-  TalentList,
+  TalentPage,
   TalentRow,
   TalentStudent,
   TalentWork,
+  CvContacts,
+  CvContent,
+  CvDoc,
+  CvView,
+  CvVisibility,
+  CvWork,
+  OwnCv,
 } from "@/lib/types";
 import { canViewFile, type FileViewer } from "@/lib/file-access";
 import {
@@ -47,6 +54,7 @@ import {
   type PointsCell,
   TALENT_PAGE_SIZE,
   type ContactResponseBody,
+  type CvBody,
   type EmployerProfileBody,
   type ProfileStatus,
   type StudentProfileBody,
@@ -1460,7 +1468,7 @@ type TalentSqlRow = {
 
 // Active students who opted in, in public order (tier, then name), one page at a time. Not cached: only signed-in
 // employers and admins read it, and open_to_work changes must show at once.
-export async function listTalent(query: TalentQuery): Promise<TalentList> {
+export async function listTalent(query: TalentQuery): Promise<TalentPage> {
   const { data, error } = await getAdminClient().rpc("talent_directory", {
     p_faculty: query.faculty_id ?? null,
     p_tier: query.tier ?? null,
@@ -1518,7 +1526,10 @@ function employerRequestState(r: RequestSqlRow, studentActive: boolean): Employe
 
 // One student of the directory, for /talent/[studentId]: the public fields, the approved works with whether this
 // viewer may open each document, and the employer's latest request. null unless the student is active and open to work.
-export async function getTalentStudent(studentId: string, viewer: FileViewer & { kind: "user" }): Promise<TalentStudent | null> {
+export async function getTalentStudent(
+  studentId: string,
+  viewer: FileViewer & { kind: "user" },
+): Promise<Omit<TalentStudent, "cv_available"> | null> {
   const db = getAdminClient();
   const profile = await db
     .from("profiles")
@@ -1681,4 +1692,203 @@ export async function getAuthEmail(userId: string): Promise<string | null> {
   const { data, error } = await getAdminClient().auth.admin.getUserById(userId);
   if (error) throw error;
   return data.user?.email ?? null;
+}
+
+// --------------------------------------------------------------------- CV
+// The in-app CV (migration 20261108000000, CLAUDE.md rule 12). Writes go through save_cv() / set_cv_visibility().
+// Reads return raw parts; src/lib/cv.ts decides with cvAccess() what a viewer gets and logs the view.
+
+type CvRow = CvContent &
+  CvContacts & { cv_visibility: CvVisibility; cv_public_confirmed_at: string | null; updated_at: string };
+
+const CV_COLUMNS =
+  "about, skills, languages, experience, links, contact_phone, contact_email, contact_telegram, contact_city, cv_visibility, cv_public_confirmed_at, updated_at";
+
+export type CvStudent = {
+  student_id: string;
+  full_name: string;
+  university: string | null;
+  faculty: string | null;
+  course: number | null;
+  active: boolean;
+};
+
+export type CvParts = { student: CvStudent; cv: CvRow | null };
+
+const EMPTY_CV: CvDoc = {
+  about: "",
+  skills: [],
+  languages: [],
+  experience: [],
+  links: [],
+  contact_phone: null,
+  contact_email: null,
+  contact_telegram: null,
+  contact_city: null,
+};
+
+// The student (role student, any status) and their CV row, if any. null when there is no such student.
+export async function getCvParts(studentId: string): Promise<CvParts | null> {
+  const db = getAdminClient();
+  const [profile, cv] = await Promise.all([
+    db
+      .from("profiles")
+      .select("id, full_name, course, status, universities(name), faculties(name)")
+      .eq("id", studentId)
+      .eq("role", "student")
+      .maybeSingle<{
+        id: string;
+        full_name: string;
+        course: number | null;
+        status: ProfileStatus;
+        universities: { name: string } | null;
+        faculties: { name: string } | null;
+      }>(),
+    db.from("student_cvs").select(CV_COLUMNS).eq("student_id", studentId).maybeSingle<CvRow>(),
+  ]);
+  if (profile.error) throw profile.error;
+  if (cv.error) throw cv.error;
+  if (!profile.data) return null;
+  const p = profile.data;
+  return {
+    student: {
+      student_id: p.id,
+      full_name: p.full_name,
+      university: p.universities?.name ?? null,
+      faculty: p.faculties?.name ?? null,
+      course: p.course,
+      active: p.status === "active",
+    },
+    cv: cv.data ?? null,
+  };
+}
+
+// Whether this employer has an accepted contact request from the student.
+export async function hasAcceptedRequest(employerId: string, studentId: string): Promise<boolean> {
+  const { count, error } = await getAdminClient()
+    .from("contact_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("employer_id", employerId)
+    .eq("student_id", studentId)
+    .eq("status", "accepted");
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+// For the talent directory: which of these students have a CV, its visibility, and which accepted this employer.
+export async function getCvAvailabilityParts(
+  employerId: string | null,
+  studentIds: string[],
+): Promise<{ visibility: Map<string, CvVisibility>; accepted: Set<string> }> {
+  if (studentIds.length === 0) return { visibility: new Map(), accepted: new Set() };
+  const db = getAdminClient();
+  const [cvs, accepted] = await Promise.all([
+    db.from("student_cvs").select("student_id, cv_visibility").in("student_id", studentIds),
+    employerId
+      ? db
+          .from("contact_requests")
+          .select("student_id")
+          .eq("employer_id", employerId)
+          .eq("status", "accepted")
+          .in("student_id", studentIds)
+      : Promise.resolve({ data: [] as { student_id: string }[], error: null }),
+  ]);
+  if (cvs.error) throw cvs.error;
+  if (accepted.error) throw accepted.error;
+  return {
+    visibility: new Map((cvs.data ?? []).map((r) => [r.student_id as string, r.cv_visibility as CvVisibility])),
+    accepted: new Set((accepted.data ?? []).map((r) => r.student_id as string)),
+  };
+}
+
+// The all-time tier and the approved works (metadata only, no points) for a CV.
+export async function getCvVerified(studentId: string): Promise<{ tier: PublicTier | null; works: CvWork[] }> {
+  const db = getAdminClient();
+  const [board, works] = await Promise.all([
+    db.from("leaderboard").select("tier_code, tier_label, tier_sort").eq("student_id", studentId).maybeSingle(),
+    db
+      .from("public_works")
+      .select("submission_id, title, type_name, issuer, achievement_date, level, result")
+      .eq("student_id", studentId)
+      .order("achievement_date", { ascending: false }),
+  ]);
+  if (board.error) throw board.error;
+  if (works.error) throw works.error;
+  const b = board.data as { tier_code: string | null; tier_label: TypeName | null; tier_sort: number | null } | null;
+  return { tier: b ? tierOf(b) : null, works: (works.data ?? []) as CvWork[] };
+}
+
+export function cvContent(cv: CvRow | null): CvContent {
+  const c = cv ?? EMPTY_CV;
+  return { about: c.about, skills: c.skills, languages: c.languages, experience: c.experience, links: c.links };
+}
+
+export function cvContacts(cv: CvRow | null): CvContacts {
+  const c = cv ?? EMPTY_CV;
+  return {
+    contact_phone: c.contact_phone,
+    contact_email: c.contact_email,
+    contact_telegram: c.contact_telegram,
+    contact_city: c.contact_city,
+  };
+}
+
+// The owner's editor data: the editable document plus the full view for the live preview.
+export async function getOwnCv(studentId: string): Promise<OwnCv | null> {
+  const parts = await getCvParts(studentId);
+  if (!parts) return null;
+  const { tier, works } = await getCvVerified(studentId);
+  const { student, cv } = parts;
+  const view: CvView = {
+    student_id: student.student_id,
+    full_name: student.full_name,
+    university: student.university,
+    faculty: student.faculty,
+    ...(student.course != null ? { course: student.course } : {}),
+    tier,
+    content: cvContent(cv),
+    contacts: cvContacts(cv),
+    works,
+    updated_at: cv?.updated_at ?? null,
+  };
+  return {
+    doc: { ...cvContent(cv), ...cvContacts(cv) },
+    visibility: cv?.cv_visibility ?? "private",
+    public_confirmed_at: cv?.cv_public_confirmed_at ?? null,
+    updated_at: cv?.updated_at ?? null,
+    view,
+  };
+}
+
+export type CvOutcome<T> = { ok: true; data: T } | { ok: false; code: string };
+
+async function cvCall<T>(fn: string, args: Record<string, unknown>): Promise<CvOutcome<T>> {
+  const { data, error } = await getAdminClient().rpc(fn, args);
+  if (!error) return { ok: true, data: data as T };
+  if (error.code === "P0001") return { ok: false, code: error.message };
+  throw error;
+}
+
+export function saveCv(studentId: string, body: CvBody): Promise<CvOutcome<string>> {
+  return cvCall<string>("save_cv", { p_student: studentId, p_doc: body });
+}
+
+export function setCvVisibility(
+  studentId: string,
+  visibility: CvVisibility,
+  confirm: boolean,
+): Promise<CvOutcome<{ visibility: CvVisibility; public_confirmed_at: string | null }>> {
+  return cvCall("set_cv_visibility", { p_student: studentId, p_visibility: visibility, p_confirm: confirm });
+}
+
+// Audit row for each employer or admin view of a CV. Never the CV text or contacts.
+export async function logCvView(actorId: string, kind: "admin" | "employer", studentId: string, page: string): Promise<void> {
+  const { error } = await getAdminClient().from("audit_log").insert({
+    actor_id: actorId,
+    action: kind === "admin" ? "admin.cv_viewed" : "employer.cv_viewed",
+    entity: "profile",
+    entity_id: studentId,
+    details: { page },
+  });
+  if (error) throw error;
 }

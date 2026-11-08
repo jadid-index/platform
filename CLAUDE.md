@@ -38,7 +38,7 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    'public' anyone (set by the owner only after the confirmation dialog, `public_confirmed_at`), 'verified' employers
    with `employer_profiles.verified = true` (default), 'private' nobody else. A reviewer's `sensitive_data_flag` forces
    private for good. Changes go only through `set_file_visibility()` / `set_sensitive_flag()` (they write `audit_log`).
-5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v3) promises:
+5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v4) promises:
    name, university, faculty, tier (never points, rule 11), the number of approved works, and for each approved work
    its title, type, issuer, date, level, result, certificate reference and a verified mark, plus the profile photo
    if the student uploaded one, plus the document only as rule 4 allows. Never the email, course or exact points.
@@ -47,6 +47,7 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    students who switched on `profiles.open_to_work`. A student's contact detail reaches an employer only when the
    student accepts that employer's contact request and picks which one to share (phone, Telegram or email); it is
    stored on that request only, shown only while the student is active, and never written to `audit_log`.
+   That employer can also open the student's CV with its contact fields (rule 12); the accept dialog says so.
    Each employer view of a student profile is logged (`employer.profile_viewed`).
    Google sign-in must not import a profile photo (no avatar_url), and the name from Google is only a
    suggestion that the student confirms, because it is shown publicly.
@@ -75,6 +76,18 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    uses the student's best academic year, and no tier ("–") below the lowest threshold. Public order is tier (best
    first), then name; there is no tie-breaking by approval date and no approval-order data in public responses.
    `tests/tiers.test.ts` scans every public route's JSON for point, rank and approval-time keys.
+12. **CV data follows the visibility rules: private by default. CV contact details are shown only to an employer with
+   an accepted contact request, never on a public view. CVs are never sent to the AI model.**
+   One CV per student in `student_cvs` (`docs/SPEC.md` section 3f); writes only through `save_cv()` /
+   `set_cv_visibility()` (zod first, the same limits again in SQL, 60 writes an hour, audit rows without CV text).
+   `cvAccess()` (`src/lib/cv-access.ts`) decides: owner and admins always (with contacts and course); an employer with
+   an accepted request always (with contacts and course); 'verified' also verified employers (course, no contacts);
+   'public' anyone (set only after the confirmation dialog, `cv_public_confirmed_at`), without contacts and without
+   the course; everyone else 404. A student who is not active: owner and admins only. The server leaves the hidden
+   fields out of the data (`loadCvForViewer()` in `src/lib/cv.ts`). Every employer and admin view is logged
+   (`employer.cv_viewed`, `admin.cv_viewed`). No CV data in any listing or public API; `/talent` gets only the
+   boolean `cv_available`. One disclaimer line marks the typed sections as self-declared; links are https only, rendered with
+   `rel="noopener noreferrer nofollow"`. CV pages are `noindex` and never cached. `tests/cv*.test.ts` cover this.
 
 ## UI
 
@@ -104,6 +117,8 @@ do not regenerate or re-run the seed against a live database, and never edit poi
 - Use the component library. Do not build custom form controls for Thursday.
 - Every list and screen needs a loading state, an empty state and an error state.
 - Most important screens, in this order: leaderboard, reviewer review screen, add achievement, student dashboard, sign-up.
+- CV: `/cv` editor (live preview; tabs below lg, side by side from lg), `/cv/[id]` view and `/cv/[id]/print`
+  (A4 print stylesheet in `globals.css`; `data-print-page` hides the navigation, `data-shell-chrome` marks it).
 - Leaderboard defaults to the current academic year (1 September start), with tabs for earlier years and all-time,
   and filters for university and faculty. It shows tier sections (best first), names in alphabetical order within a
   tier, a tier badge with the letter always visible, no numbered list and no medals (rule 11).
@@ -149,7 +164,7 @@ do not regenerate or re-run the seed against a live database, and never edit poi
   account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (an admin promotes them on `/admin/users`; the first admin is created by SQL).
-- Consent v3 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) and the employer terms
+- Consent v4 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) and the employer terms
   (`t.employerTerms`, `employer-v1`) are drafts (`draft: true`, shown as such) until the team's text arrives in
   `docs/consent-v2.md`. The landing page's "For employers" copy (`t.home.employers`) is a placeholder. Do not launch with the drafts.
 - Employer verification is a manual admin switch on `/admin/users`; what an admin should check before switching it on

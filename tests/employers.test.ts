@@ -212,7 +212,7 @@ describe("route separation (CLAUDE.md rule 10)", () => {
   });
 
   it("student and reviewer routes refuse employers (403)", async () => {
-    const handlers = await handlersUnder("submissions", "extract", "me/contact-requests", "me/open-to-work", "review");
+    const handlers = await handlersUnder("submissions", "extract", "me/contact-requests", "me/open-to-work", "me/cv", "review");
     expect(handlers.length).toBeGreaterThan(8);
     as(employer);
     for (const h of handlers) expect((await callHandler(h)).status, h.name).toBe(403);

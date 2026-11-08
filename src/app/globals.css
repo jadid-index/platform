@@ -143,3 +143,33 @@
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Printing. No page prints the navigation or the footer. The CV print page (/cv/[id]/print, marked with
+   data-print-page) hides them on screen too, and lays the CV out as an A4 sheet. Colors stay theme tokens. */
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+  [data-shell-chrome] {
+    display: none !important;
+  }
+  html,
+  body {
+    background: var(--surface-raised);
+  }
+  .cv-entry,
+  .cv-section > h2 {
+    break-inside: avoid;
+  }
+  .cv-section > div:first-child {
+    break-after: avoid;
+  }
+  a {
+    text-decoration: none;
+  }
+}
+
+body:has([data-print-page]) [data-shell-chrome] {
+  display: none;
+}

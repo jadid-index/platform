@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { CONSENT_VERSION, EMPLOYER_TERMS_VERSION } from "@/lib/consent";
-import { FILE_VISIBILITIES } from "@/lib/types";
+import { CV_LANGUAGE_LEVELS, CV_VISIBILITIES, FILE_VISIBILITIES } from "@/lib/types";
 
 // Shared by the forms and the route handlers. The server always re-validates.
 
@@ -88,6 +88,127 @@ export const CONTACT_ERRORS: Record<string, number> = {
   not_found: 404,
   already_answered: 409,
   contact_required: 400,
+};
+
+// ------------------------------------------------------------------------ CV
+// PUT /api/me/cv and PATCH /api/me/cv/visibility. The same limits are checked again by cv_content_valid() and the
+// column checks in SQL (20261108000000). Lengths count characters (code points), like Postgres char_length().
+
+export const CV_LIMITS = {
+  about: 600,
+  skills: 20,
+  skill: 40,
+  languages: 8,
+  language: 40,
+  experience: 10,
+  expTitle: 120,
+  expOrganization: 120,
+  expDescription: 300,
+  links: 5,
+  linkLabel: 40,
+  linkUrl: 300,
+  city: 80,
+} as const;
+
+export const charLength = (s: string) => Array.from(s).length;
+
+// Control characters (C0, DEL, C1) and bidi overrides that could disguise text. Newlines only where allowed.
+const CONTROL_RE = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/;
+const CONTROL_OR_NEWLINE_RE = /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/;
+
+function cvText(min: number, max: number, newlines = false) {
+  return z
+    .string()
+    .transform((s) => s.replace(/\r\n?/g, "\n").trim())
+    .refine((s) => charLength(s) >= min && charLength(s) <= max, { message: "length" })
+    .refine((s) => !(newlines ? CONTROL_RE : CONTROL_OR_NEWLINE_RE).test(s), { message: "control_characters" });
+}
+
+export const CV_MONTH_RE = /^(19[5-9]\d|20\d\d)-(0[1-9]|1[0-2])$/;
+export const currentMonthInTashkent = () => todayInTashkent().slice(0, 7);
+const cvMonth = z
+  .string()
+  .regex(CV_MONTH_RE)
+  .refine((m) => m <= currentMonthInTashkent(), { message: "future_month" });
+
+// The same shape as the SQL check: https, a dotted host, no user:password@ part.
+const CV_URL_RE = /^https:\/\/[^\s/?#@\\]+\.[^\s/?#@\\]+([/?#]\S*)?$/;
+
+// Returns the normalized https URL, or null. Used by the schema and again when a link is rendered.
+export function safeHttpsUrl(raw: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return null;
+  const host = url.hostname;
+  if (!host.includes(".") || host.startsWith(".") || host.endsWith(".")) return null;
+  const href = url.href;
+  if (charLength(href) > CV_LIMITS.linkUrl || !CV_URL_RE.test(href)) return null;
+  return href;
+}
+
+const cvUrl = z.string().transform((raw, ctx) => {
+  const href = safeHttpsUrl(raw);
+  if (!href) {
+    ctx.addIssue({ code: "custom", message: "https_only" });
+    return z.NEVER;
+  }
+  return href;
+});
+
+// An optional contact: "" or null is stored as null.
+function optionalContact<T extends z.ZodType<string>>(schema: T) {
+  return z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? null : v), schema.nullable());
+}
+
+export const cvExperienceSchema = z
+  .strictObject({
+    title: cvText(1, CV_LIMITS.expTitle),
+    organization: cvText(1, CV_LIMITS.expOrganization),
+    start: cvMonth,
+    end: cvMonth.nullable(),
+    description: cvText(0, CV_LIMITS.expDescription, true),
+  })
+  .refine((e) => e.end === null || e.end >= e.start, { path: ["end"], message: "end_before_start" });
+
+export const cvBodySchema = z.strictObject({
+  about: cvText(0, CV_LIMITS.about, true),
+  skills: z
+    .array(cvText(1, CV_LIMITS.skill))
+    .max(CV_LIMITS.skills)
+    .refine((a) => new Set(a.map((s) => s.toLowerCase())).size === a.length, { message: "duplicate_skill" }),
+  languages: z
+    .array(z.strictObject({ name: cvText(1, CV_LIMITS.language), level: z.enum(CV_LANGUAGE_LEVELS) }))
+    .max(CV_LIMITS.languages),
+  experience: z.array(cvExperienceSchema).max(CV_LIMITS.experience),
+  links: z.array(z.strictObject({ label: cvText(1, CV_LIMITS.linkLabel), url: cvUrl })).max(CV_LIMITS.links),
+  contact_phone: optionalContact(phoneSchema),
+  contact_email: optionalContact(emailSchema.pipe(z.string().max(254))),
+  contact_telegram: optionalContact(
+    z
+      .string()
+      .trim()
+      .transform((v) => (v.startsWith("@") ? v : `@${v}`))
+      .pipe(telegramSchema),
+  ),
+  contact_city: optionalContact(cvText(2, CV_LIMITS.city)),
+});
+export type CvBody = z.infer<typeof cvBodySchema>;
+
+export const cvVisibilityBodySchema = z
+  .strictObject({ visibility: z.enum(CV_VISIBILITIES), confirm: z.literal(true).optional() })
+  .refine((b) => b.visibility !== "public" || b.confirm === true, { path: ["confirm"], message: "confirmation_required" });
+export type CvVisibilityBody = z.infer<typeof cvVisibilityBodySchema>;
+
+// Exceptions raised by save_cv() / set_cv_visibility().
+export const CV_ERRORS: Record<string, number> = {
+  not_active_student: 403,
+  invalid_cv: 400,
+  rate_limited: 429,
+  confirmation_required: 400,
 };
 
 // ---------------------------------------------------------------- submissions

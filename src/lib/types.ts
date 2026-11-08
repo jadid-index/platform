@@ -203,7 +203,10 @@ export type TalentRow = {
   tier: PublicTier | null; // all-time: the best academic year
 };
 
-export type TalentList = { rows: TalentRow[]; total: number; page: number; page_size: number };
+// cv_available: this viewer may open the student's CV (cvAccess(), rule 12). A boolean only, never CV data.
+export type TalentListRow = TalentRow & { cv_available: boolean };
+export type TalentPage<R = TalentRow> = { rows: R[]; total: number; page: number; page_size: number };
+export type TalentList = TalentPage<TalentListRow>;
 
 // A work in the directory: the public metadata plus whether this viewer may open the document (canViewFile()).
 export type TalentWork = PublicWork & { can_view_file: boolean };
@@ -225,6 +228,7 @@ export type TalentStudent = Omit<TalentRow, "approved_count"> & {
   approved_count: number;
   works: TalentWork[];
   request: EmployerRequestState | null; // the latest request of this employer, if any
+  cv_available: boolean;
 };
 
 export type EmployerSentRequest = EmployerRequestState & {
@@ -244,4 +248,65 @@ export type StudentContactRequest = {
   contact_person: string | null;
   employer_verified: boolean;
   shared_contact_kind: "phone" | "telegram" | "email" | null;
+};
+
+// ------------------------------------------------------------------------ CV
+// The in-app CV (migration 20261108000000, CLAUDE.md rule 12). Typed by the student ("self-declared"); education
+// comes from the profile and "verified achievements" from the approved works, both read at view time.
+
+export const CV_VISIBILITIES = ["private", "verified", "public"] as const;
+export type CvVisibility = (typeof CV_VISIBILITIES)[number];
+export const CV_LANGUAGE_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2", "native"] as const;
+export type CvLanguageLevel = (typeof CV_LANGUAGE_LEVELS)[number];
+
+export type CvLanguage = { name: string; level: CvLanguageLevel };
+export type CvExperience = {
+  title: string;
+  organization: string;
+  start: string; // YYYY-MM
+  end: string | null; // YYYY-MM, null = present
+  description: string;
+};
+export type CvLink = { label: string; url: string }; // https only
+export type CvContent = {
+  about: string;
+  skills: string[];
+  languages: CvLanguage[];
+  experience: CvExperience[];
+  links: CvLink[];
+};
+export type CvContacts = {
+  contact_phone: string | null;
+  contact_email: string | null;
+  contact_telegram: string | null;
+  contact_city: string | null;
+};
+// What the student edits (PUT /api/me/cv). The visibility is changed separately.
+export type CvDoc = CvContent & CvContacts;
+
+// An approved work on the CV: metadata only, never points or rank.
+export type CvWork = Pick<PublicWork, "submission_id" | "title" | "type_name" | "issuer" | "achievement_date" | "level" | "result">;
+
+// The CV as one viewer may see it. `course` and `contacts` are left out of the object (not set to null) when the
+// viewer may not see them, so they can never reach a public response.
+export type CvView = {
+  student_id: string;
+  full_name: string;
+  university: string | null;
+  faculty: string | null;
+  course?: number;
+  tier: PublicTier | null; // all-time: the best academic year
+  content: CvContent;
+  contacts?: CvContacts;
+  works: CvWork[];
+  updated_at: string | null;
+};
+
+// The owner's editor data (GET /api/me/cv).
+export type OwnCv = {
+  doc: CvDoc;
+  visibility: CvVisibility;
+  public_confirmed_at: string | null;
+  updated_at: string | null;
+  view: CvView; // the full CV, for the live preview
 };

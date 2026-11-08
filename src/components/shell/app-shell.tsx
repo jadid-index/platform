@@ -19,7 +19,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       {/* Same width and side padding as <main>, so the pill lines up with the content. */}
-      <header className="sticky top-0 z-40 mx-auto w-full max-w-content px-3 pt-3 sm:px-4 lg:px-8">
+      {/* data-shell-chrome: hidden when printing, and on the CV print page (globals.css). */}
+      <header data-shell-chrome className="sticky top-0 z-40 mx-auto w-full max-w-content px-3 pt-3 sm:px-4 lg:px-8">
         <div className="flex h-14 items-center gap-2 rounded-full border bg-surface-raised/80 pr-2 pl-4 shadow-nav backdrop-blur-md sm:pl-5">
           <Logo />
           <nav aria-label={t.nav.main} className="mx-auto hidden items-center gap-1 lg:flex">
@@ -58,10 +59,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-content flex-1 flex-col gap-6 px-4 pt-6 pb-10 lg:px-8 lg:pt-10">
+      <main className="mx-auto flex w-full max-w-content flex-1 flex-col gap-6 px-4 pt-6 pb-10 lg:px-8 lg:pt-10 print:max-w-none print:p-0">
         {children}
       </main>
-      <SiteFooter />
+      <div data-shell-chrome>
+        <SiteFooter />
+      </div>
     </div>
   );
 }
