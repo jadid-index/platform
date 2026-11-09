@@ -90,7 +90,7 @@ export const uz = {
     step: "{n}-qadam",
     steps: [
       { title: "Hujjatni yuklang", text: "Sertifikat, diplom yoki maqola sahifasini yuklang va maʼlumotlarni tekshiring." },
-      { title: "Koʻrib chiquvchi tasdiqlaydi", text: "Hujjat tekshiriladi; rad etilsa, sababi yoziladi." },
+      { title: "Mutaxassislar tasdiqlaydi", text: "Hujjat tekshiriladi; rad etilsa, sababi yoziladi." },
       { title: "Daraja paydo boʻladi", text: "Ball baholash jadvali boʻyicha hisoblanadi; reytingda siz darajangiz bilan koʻrinasiz." },
     ],
     ctaTitle: "Yutuqlaringiz reytingda koʻrinsin",
@@ -184,7 +184,7 @@ export const uz = {
     optionsError: "Universitetlar roʻyxatini yuklab boʻlmadi.",
     noUniversities: "Hozircha universitetlar qoʻshilmagan.",
   },
-  // Consent notice v4 (CONSENT_VERSION in src/lib/consent.ts). DRAFT: the team's final text replaces it
+  // Consent notice v5 (CONSENT_VERSION in src/lib/consent.ts). DRAFT: the team's final text replaces it
   // (docs/consent-v2.md). The Russian text is in src/i18n/ru.ts. Bump the version whenever this text changes.
   consent: {
     draft: true,
@@ -196,6 +196,7 @@ export const uz = {
       "Yuklagan hujjatingizni har doim siz, koʻrib chiquvchilar va administratorlar koʻradi. Har bir tasdiqlangan yutuq uchun hujjatni yana kim koʻrishini oʻzingiz tanlaysiz: «Faqat men», «Tasdiqlangan ish beruvchilar» (sukut boʻyicha) yoki «Hamma». «Hamma» faqat hujjatni tekshirib, unda ommaga ochilishini istamagan shaxsiy maʼlumot yoʻqligini tasdiqlaganingizdan keyin yoqiladi. Koʻrib chiquvchi hujjatda shaxsiy maʼlumot (ID yoki pasport raqami, manzil, telefon) borligini belgilasa, hujjat faqat sizga va koʻrib chiquvchilarga koʻrinadi.",
       "Ish beruvchilar uchun isteʼdodlar roʻyxati: kabinetingizda «Ishga tayyorman» belgisini yoqsangiz, tizimga kirgan ish beruvchilar ismingiz, universitetingiz, fakultetingiz, darajangiz va tasdiqlangan yutuqlaringizni (yuqoridagi ochiq maʼlumotlarning oʻzi) shu roʻyxatda koʻradi. Belgi sukut boʻyicha oʻchiq, uni istalgan vaqtda oʻchirishingiz mumkin. Ish beruvchi sizga aloqa soʻrovi yuborishi mumkin; telefon, Telegram yoki e-pochtangizni faqat soʻrovni qabul qilib, qaysi birini berishni oʻzingiz tanlaganingizdan keyin koʻradi. Ish beruvchilar profilingizni har safar koʻrganda bu jurnalga yoziladi.",
       "Rezyume (ixtiyoriy): «Rezyume» sahifasida oʻzingiz haqingizda matn, koʻnikmalar, tillar, tajriba, havolalar va rezyume uchun aloqa maʼlumotlarini (telefon, e-pochta, Telegram, shahar) kiritishingiz mumkin. Ularni platforma tekshirmaydi va bu rezyumeda alohida koʻrsatiladi. Rezyume sukut boʻyicha yopiq: uni faqat siz va administratorlar koʻradi. «Tasdiqlangan ish beruvchilar»ni tanlasangiz, platforma tasdiqlagan ish beruvchilar ham koʻradi; «Havolasi bor har kim»ni tanlasangiz (tasdiqlash oynasidan keyin), havolani bilgan har kim, tizimga kirmaganlar ham koʻradi. Aloqa soʻrovini qabul qilganingiz ish beruvchi rezyumeingizni har doim, aloqa maʼlumotlari bilan birga koʻradi. Rezyumedagi aloqa maʼlumotlari va kursingiz hech qachon ochiq koʻrsatilmaydi. Ish beruvchi yoki administrator rezyumeingizni har safar koʻrganda bu jurnalga yoziladi. Rezyume sunʼiy intellekt xizmatiga yuborilmaydi.",
+      "Yuklangan rezyume (ixtiyoriy): rezyume sahifasida oʻzingiz tayyorlagan rezyumeni PDF fayl (5 MB gacha) qilib yuklashingiz mumkin. U yuqoridagi rezyume bilan bir xil tanlov boʻyicha ochiladi: «Havolasi bor har kim»ni tanlasangiz, faylni havolani bilgan har kim yuklab oladi, shuning uchun fayl ichidagi telefon, manzil yoki pasport maʼlumotlarini oldindan tekshirasiz. Faylni platforma tekshirmaydi (faqat haqiqiy PDF ekani, shifrlanmagani va ichida skript yoʻqligi oddiy tekshiriladi). Fayl yangisi bilan almashtirilguncha yoki oʻzingiz oʻchirguningizcha saqlanadi; almashtirilgan yoki oʻchirilgan fayl darhol oʻchiriladi, yakunlanmagan yuklashlar bir soatdan keyin oʻchiriladi. Ish beruvchi yoki administrator faylni har safar yuklab olganda bu jurnalga yoziladi. Fayl sunʼiy intellekt xizmatiga yuborilmaydi.",
       "Hujjatlarni suiisteʼmoldan himoya qilish uchun hujjat ochilganda IP manzilingizning qaytarib boʻlmaydigan kodi (xeshi) bir kun saqlanadi; IP manzilning oʻzi saqlanmaydi.",
       "Maʼlumotlaringiz Oʻzbekistondan tashqaridagi serverlarda saqlanadi. Formalarni avtomatik toʻldirish uchun yuklangan hujjat matnni aniqlash xizmatiga yuborilishi mumkin; unga faqat hujjatning oʻzi yuboriladi, profil maʼlumotlaringiz yuborilmaydi. Bu xizmat ham Oʻzbekistondan tashqarida ishlashi mumkin.",
       "Istalgan vaqtda fazlddn4@gmail.com manziliga yozib, hisobingiz va hujjatlaringizni oʻchirishni soʻrashingiz mumkin. Batafsil: Maxfiylik siyosati.",
@@ -211,7 +212,7 @@ export const uz = {
     draftLabel: "Qoralama: bu sahifa jamoa tayyorlaydigan yakuniy matn bilan almashtiriladi.",
     title: "Maxfiylik siyosati",
     updated: "Yangilangan: {date}",
-    updatedDate: "2026-11-08",
+    updatedDate: "2026-11-09",
     russian: "Русская версия",
     sections: [
       {
@@ -220,7 +221,7 @@ export const uz = {
       },
       {
         title: "Qanday maʼlumotlarni toʻplaymiz",
-        text: "Ism-sharif, e-pochta, universitet, fakultet, kurs, yuklangan hujjatlar va ular haqidagi maʼlumotlar (nomi, tashkilot, sana, daraja, natija, sertifikat raqami), koʻrib chiqish natijalari va ballar, hujjat ochilganda IP manzilning xeshi. Rezyume toʻldirsangiz: oʻzingiz haqingizdagi matn, koʻnikmalar, tillar, tajriba, havolalar va rezyume uchun aloqa maʼlumotlari (telefon, e-pochta, Telegram, shahar).",
+        text: "Ism-sharif, e-pochta, universitet, fakultet, kurs, yuklangan hujjatlar va ular haqidagi maʼlumotlar (nomi, tashkilot, sana, daraja, natija, sertifikat raqami), koʻrib chiqish natijalari va ballar, hujjat ochilganda IP manzilning xeshi. Rezyume toʻldirsangiz: oʻzingiz haqingizdagi matn, koʻnikmalar, tillar, tajriba, havolalar va rezyume uchun aloqa maʼlumotlari (telefon, e-pochta, Telegram, shahar). Rezyume faylini yuklasangiz: fayl va uning nomi, hajmi, yuklangan sanasi.",
       },
       {
         title: "Nima uchun",
@@ -236,7 +237,7 @@ export const uz = {
       },
       {
         title: "Rezyume",
-        text: "Rezyume ixtiyoriy va sukut boʻyicha yopiq (faqat siz va administratorlar). Talaba uni tasdiqlangan ish beruvchilarga yoki tasdiqlash oynasidan keyin havolasi bor har kimga ochishi mumkin. Ochiq rezyumeda ism-sharif, universitet, fakultet, daraja, talaba kiritgan boʻlimlar va tasdiqlangan yutuqlar koʻrinadi; aloqa maʼlumotlari va kurs koʻrinmaydi. Talaba aloqa soʻrovini qabul qilgan ish beruvchi rezyumeni aloqa maʼlumotlari bilan koʻradi. Ish beruvchi va administratorning har bir koʻrishi audit jurnaliga yoziladi. Rezyume qidiruv tizimlariga koʻrsatilmaydi va sunʼiy intellektga yuborilmaydi.",
+        text: "Rezyume ixtiyoriy va sukut boʻyicha yopiq (faqat siz va administratorlar). Talaba uni tasdiqlangan ish beruvchilarga yoki tasdiqlash oynasidan keyin havolasi bor har kimga ochishi mumkin. Ochiq rezyumeda ism-sharif, universitet, fakultet, daraja, talaba kiritgan boʻlimlar va tasdiqlangan yutuqlar koʻrinadi; aloqa maʼlumotlari va kurs koʻrinmaydi. Talaba aloqa soʻrovini qabul qilgan ish beruvchi rezyumeni aloqa maʼlumotlari bilan koʻradi. Ish beruvchi va administratorning har bir koʻrishi audit jurnaliga yoziladi. Rezyume qidiruv tizimlariga koʻrsatilmaydi va sunʼiy intellektga yuborilmaydi. Talaba yuklagan PDF rezyume rezyume bilan bir xil tanlov boʻyicha ochiladi, yopiq omborda saqlanadi va faqat 60 soniyalik havola orqali yuklab olinadi; platforma uning mazmunini tekshirmaydi. Fayl almashtirilguncha yoki talaba oʻchirguncha saqlanadi; yakunlanmagan yuklashlar bir soatdan keyin oʻchiriladi. Ish beruvchi va administratorning har bir yuklab olishi audit jurnaliga yoziladi.",
       },
       {
         title: "Hujjatlar",
@@ -391,6 +392,8 @@ export const uz = {
     noDocument: "Hujjat yopiq",
     adminNote: "Siz administratorsiz: roʻyxatni koʻrishingiz mumkin, lekin soʻrov yubora olmaysiz.",
     openCv: "Rezyumeni ochish",
+    downloadCv: "Rezyumeni yuklab olish (PDF)",
+    downloadCvLabel: "talaba yuklagan, tekshirilmagan",
     requestTitle: "Aloqa soʻrovi",
     requestHint: "Talaba xabaringizni, kompaniya nomini va masʼul shaxsni koʻradi. Qabul qilsa, oʻzi tanlagan aloqa maʼlumotini ochadi.",
     message: "Xabar",
@@ -491,7 +494,7 @@ export const uz = {
       email: "Toʻgʻri e-pochta manzilini kiriting.",
     } as Record<string, string>,
     acceptCvNote:
-      "Qabul qilsangiz, bu ish beruvchi rezyumeingizni ham koʻra oladi, undagi aloqa maʼlumotlari (telefon, e-pochta, Telegram, shahar) bilan birga.",
+      "Qabul qilsangiz, bu ish beruvchi rezyumeingizni ham koʻra oladi, undagi aloqa maʼlumotlari (telefon, e-pochta, Telegram, shahar) bilan birga, va yuklagan PDF rezyumeingizni yuklab ola oladi.",
     share: "Ulashish va qabul qilish",
     saving: "Saqlanmoqda…",
     acceptedShared: "Qabul qildingiz: {kind} ulashildi.",
@@ -639,6 +642,7 @@ export const uz = {
       invalid_body: "Ayrim maydonlar notoʻgʻri. Belgilangan joylarni tuzating.",
       invalid_cv: "Ayrim maydonlar notoʻgʻri. Belgilangan joylarni tuzating.",
       confirmation_required: "Davom etish uchun tasdiqlash belgisini qoʻying.",
+      file_confirmation_required: "Davom etish uchun ikkala tasdiqlash belgisini qoʻying.",
       profile_not_active: "Profilingiz bloklangan, rezyumeni oʻzgartirib boʻlmaydi.",
     } as Record<string, string>,
     tabs: { edit: "Tahrirlash", preview: "Koʻrinishi" },
@@ -685,6 +689,59 @@ export const uz = {
     updated: "Yangilangan: {date}",
     openCv: "Rezyumeni ochish",
     generatedBy: "Jadid Index rezyumesi · {url}",
+    // The uploaded CV (a PDF the student made elsewhere). Same visibility as the typed CV.
+    file: {
+      title: "Yuklangan rezyume (PDF)",
+      description: "Boshqa joyda tayyorlagan rezyumeingiz boʻlsa, PDF qilib yuklang. U yuqoridagi rezyume bilan bir xil tanlov boʻyicha koʻrinadi.",
+      label: "Siz yukladingiz",
+      help: [
+        "Faqat PDF, 5 MB gacha. Parol bilan himoyalangan PDF qabul qilinmaydi.",
+        "Fayl oddiy tekshiruvdan oʻtadi (haqiqiy PDF ekani, shifrlanmagani, ichida skript yoki ilova fayl yoʻqligi). Bu antivirus tekshiruvi emas.",
+        "Fayldagi telefon, manzil yoki pasport maʼlumotlarini oʻzingiz tekshiring: rezyume kimga ochiq boʻlsa, fayl ham ularga ochiq.",
+      ],
+      drop: "PDF faylni shu yerga tashlang",
+      or: "yoki",
+      choose: "Fayl tanlash",
+      replace: "Almashtirish",
+      delete: "Oʻchirish",
+      download: "Yuklab olish",
+      uploading: "Yuklanmoqda…",
+      checking: "Tekshirilmoqda…",
+      deleting: "Oʻchirilmoqda…",
+      uploaded: "Yuklandi",
+      deleted: "Oʻchirildi",
+      empty: "Hali fayl yuklanmagan.",
+      meta: "{size} · {date}",
+      sizeMb: "{n} MB",
+      sizeKb: "{n} KB",
+      publicConfirm:
+        "Rezyumeingiz hammaga ochiq. Yuklangan fayl ham hammaga koʻrinadi. Unda telefon, manzil yoki pasport maʼlumotlari boʻlishi mumkin. Tekshirdim.",
+      deleteTitle: "Yuklangan rezyumeni oʻchirasizmi?",
+      deleteText: "Fayl butunlay oʻchiriladi, uni hech kim yuklab ololmaydi. Yozib olingan rezyume oʻzgarmaydi.",
+      deleteConfirm: "Ha, oʻchirish",
+      cancel: "Bekor qilish",
+      errors: {
+        file_type: "Bu PDF emas. Faqat .pdf fayl yuklash mumkin.",
+        file_too_large: "Fayl 5 MB dan katta.",
+        pdf_encrypted: "PDF parol yoki shifr bilan himoyalangan. Himoyasiz nusxasini yuklang.",
+        pdf_active_content:
+          "PDF ichida skript, avtomatik amal yoki ilova fayl bor. Hujjatni «Chop etish → PDF sifatida saqlash» orqali qayta saqlab, yuklang.",
+        pdf_unreadable: "PDF faylni oʻqib boʻlmadi. Uni qayta saqlab, yuklang.",
+        file_confirmation_required: "Davom etish uchun tasdiqlash belgisini qoʻying.",
+        rate_limited: "Juda koʻp yuklash. Bir soatdan keyin qayta urinib koʻring.",
+        upload_expired: "Yuklash muddati tugadi. Qaytadan urinib koʻring.",
+        invalid_upload: "Yuklash topilmadi. Qaytadan urinib koʻring.",
+        file_missing: "Fayl yuklanmadi. Qaytadan urinib koʻring.",
+        not_active_student: "Profilingiz bloklangan, fayl yuklab boʻlmaydi.",
+        profile_not_active: "Profilingiz bloklangan, fayl yuklab boʻlmaydi.",
+      } as Record<string, string>,
+      uploadError: "Faylni yuklab boʻlmadi. Qaytadan urinib koʻring.",
+      deleteError: "Faylni oʻchirib boʻlmadi. Qaytadan urinib koʻring.",
+      viewLabel: "Talaba yuklagan, tekshirilmagan",
+      downloadCv: "Rezyumeni yuklab olish (PDF)",
+    },
+    confirmFileCheckbox: "Yuklangan faylda telefon, manzil yoki pasport maʼlumotlari boʻlishi mumkin. Tekshirdim.",
+    publicShownFile: "Yuklangan rezyume fayli (PDF), qanday boʻlsa shunday",
   },
   // Public page of one approved work (/works/[id]). Never points (rule 11).
   work: {
@@ -996,6 +1053,13 @@ export const uz = {
   admin: {
     title: "Administrator",
     sectionsLabel: "Administrator boʻlimlari",
+    cvCleanupTitle: "Yuklangan rezyumelarni tozalash",
+    cvCleanupText:
+      "Hech bir talabaning joriy rezyumesi boʻlmagan PDF fayllarni oʻchiradi: bir soat ichida yakunlanmagan yuklashlar, almashtirilgan yoki oʻchirilgan fayllar qoldiqlari. Istalgan vaqtda bosish xavfsiz.",
+    cvCleanupButton: "Tozalash",
+    cvCleanupRunning: "Tozalanmoqda…",
+    cvCleanupDone: "Oʻchirildi: {n} ta fayl.",
+    cvCleanupError: "Tozalab boʻlmadi. Qaytadan urinib koʻring.",
     usersTitle: "Foydalanuvchilar",
     usersDescription: "Rol, holat va ish beruvchi tasdigʻini oʻzgartirish. Har bir oʻzgarish audit jurnaliga yoziladi.",
     employerVerified: "Tasdiqlangan",

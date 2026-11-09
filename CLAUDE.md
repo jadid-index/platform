@@ -38,10 +38,11 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    'public' anyone (set by the owner only after the confirmation dialog, `public_confirmed_at`), 'verified' employers
    with `employer_profiles.verified = true` (default), 'private' nobody else. A reviewer's `sensitive_data_flag` forces
    private for good. Changes go only through `set_file_visibility()` / `set_sensitive_flag()` (they write `audit_log`).
-5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v4) promises:
+5. **Public data is limited** to what the consent notice (`t.consent`, version `CONSENT_VERSION`, v5) promises:
    name, university, faculty, tier (never points, rule 11), the number of approved works, and for each approved work
    its title, type, issuer, date, level, result, certificate reference and a verified mark, plus the profile photo
-   if the student uploaded one, plus the document only as rule 4 allows. Never the email, course or exact points.
+   if the student uploaded one, plus the document only as rule 4 allows, plus the CV and the uploaded CV file only
+   as rule 12 allows (public only after the confirmation dialog). Never the email, course or exact points.
    Do not add anything else to public views; if you must, change the notice and bump its version first.
    The talent directory (`/talent`, signed-in employers and admins only) shows the same public fields, only for
    students who switched on `profiles.open_to_work`. A student's contact detail reaches an employer only when the
@@ -88,6 +89,14 @@ do not regenerate or re-run the seed against a live database, and never edit poi
    (`employer.cv_viewed`, `admin.cv_viewed`). No CV data in any listing or public API; `/talent` gets only the
    boolean `cv_available`. One disclaimer line marks the typed sections as self-declared; links are https only, rendered with
    `rel="noopener noreferrer nofollow"`. CV pages are `noindex` and never cached. `tests/cv*.test.ts` cover this.
+   **Uploaded CV** (`docs/SPEC.md` section 3g): one PDF per student in the private `cvs` bucket
+   (`{student_id}/{random}.pdf`, `cv_files` table), same `cv_visibility` and `cvAccess()` as the typed CV (no row =
+   private). Upload in three steps (`src/lib/cv-file.ts`); finalize runs `screenPdf()` (`src/lib/pdf-screen.ts`: PDF
+   signature, 5 MB, not encrypted, no active-content markers). It is a simple screen, not a malware scanner; say so
+   wherever it is described. Never process the file with the AI model. Only `GET /api/cv/:studentId/file` serves it
+   (60-second signed URL, `noindex`, `nosniff`; employer and admin downloads logged). Public with a file needs the
+   second confirmation (`confirm_file`, `confirm_public`). Replacing or deleting deletes the object; unfinished
+   uploads are removed by `cleanupCvUploads()` (button on `/admin/users`, `npm run cleanup:cv-uploads`).
 
 ## UI
 
@@ -155,6 +164,8 @@ do not regenerate or re-run the seed against a live database, and never edit poi
   `E2E_BASE_URL=http://localhost:3100 npm run test:e2e`
 - Demo data: `npm run seed:demo`; remove all test data with `npm run seed:demo -- --clean`.
   Refuses to run with `NODE_ENV=production` unless `--force` is passed.
+- Uploaded-CV cleanup: `npm run cleanup:cv-uploads` (deletes unfinished uploads older than an hour; the same job is
+  the button on `/admin/users`). Not scheduled yet: run it by hand until a cron exists.
 - AI extraction check: `npm run test:extract` runs it on every file in `test-certificates/` (gitignored, real
   documents, delete after testing). Needs `AI_EXTRACTION_ENABLED=true` and `ANTHROPIC_API_KEY`; each file is one paid call.
 
@@ -164,7 +175,7 @@ do not regenerate or re-run the seed against a live database, and never edit poi
   account per hour, but open sign-up allows many accounts. Needs a cleanup job before a wider rollout.
 - Later: identity verification (university email, HEMIS / student ID) and how it should show on profiles.
 - The list of first reviewers (an admin promotes them on `/admin/users`; the first admin is created by SQL).
-- Consent v4 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) and the employer terms
+- Consent v5 and the privacy policy (`t.consent`, `t.privacy`, Uzbek and Russian) and the employer terms
   (`t.employerTerms`, `employer-v1`) are drafts (`draft: true`, shown as such) until the team's text arrives in
   `docs/consent-v2.md`. The landing page's "For employers" copy (`t.home.employers`) is a placeholder. Do not launch with the drafts.
 - Employer verification is a manual admin switch on `/admin/users`; what an admin should check before switching it on

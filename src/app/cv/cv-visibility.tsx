@@ -19,15 +19,25 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { t } from "@/i18n";
 import { CV_VISIBILITIES, type CvVisibility } from "@/lib/types";
 
-// Who may open the CV. 'public' needs the confirmation dialog (what becomes public, a required checkbox);
+// Who may open the CV and the uploaded CV file. 'public' needs the confirmation dialog (what becomes public, a
+// required checkbox, and a second one when a file is uploaded: it may contain phone, address or ID details);
 // going back to 'private' or 'verified' saves at once. Contacts are never public (rule 12).
-export function CvVisibilityControl({ initial }: { initial: CvVisibility }) {
+export function CvVisibilityControl({
+  initial,
+  hasFile,
+  onChange,
+}: {
+  initial: CvVisibility;
+  hasFile: boolean; // an uploaded CV exists: going public needs the second checkbox (confirm_file)
+  onChange: (v: CvVisibility) => void;
+}) {
   const id = useId();
   const [value, setValue] = useState<CvVisibility>(initial);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmedFile, setConfirmedFile] = useState(false);
 
   async function save(next: CvVisibility, confirm = false): Promise<boolean> {
     setState("saving");
@@ -36,7 +46,9 @@ export function CvVisibilityControl({ initial }: { initial: CvVisibility }) {
       const res = await fetch("/api/me/cv/visibility", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(confirm ? { visibility: next, confirm: true } : { visibility: next }),
+        body: JSON.stringify(
+          confirm ? { visibility: next, confirm: true, ...(hasFile ? { confirm_file: true } : {}) } : { visibility: next },
+        ),
       });
       if (!res.ok) {
         const { error: code } = (await res.json().catch(() => ({}))) as { error?: string };
@@ -45,6 +57,7 @@ export function CvVisibilityControl({ initial }: { initial: CvVisibility }) {
         return false;
       }
       setValue(next);
+      onChange(next);
       setState("saved");
       return true;
     } catch {
@@ -59,6 +72,7 @@ export function CvVisibilityControl({ initial }: { initial: CvVisibility }) {
     if (!v || v === value) return;
     if (v === "public") {
       setConfirmed(false);
+      setConfirmedFile(false);
       setDialogOpen(true);
       return;
     }
@@ -119,6 +133,12 @@ export function CvVisibilityControl({ initial }: { initial: CvVisibility }) {
                 <span>{line}</span>
               </li>
             ))}
+            {hasFile ? (
+              <li className="flex items-start gap-2">
+                <Check className="mt-0.5 size-4 shrink-0 text-primary-text" aria-hidden />
+                <span>{t.cv.publicShownFile}</span>
+              </li>
+            ) : null}
             <li className="flex items-start gap-2">
               <EyeOff className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
               <span className="font-medium">{t.cv.publicHidden}</span>
@@ -135,12 +155,25 @@ export function CvVisibilityControl({ initial }: { initial: CvVisibility }) {
               {t.cv.confirmCheckbox}
             </Label>
           </div>
+          {hasFile ? (
+            <div className="flex items-start gap-3 rounded-lg border bg-surface-sunken p-3">
+              <Checkbox
+                id={`${id}-confirm-file`}
+                className="mt-0.5"
+                checked={confirmedFile}
+                onCheckedChange={(c) => setConfirmedFile(c === true)}
+              />
+              <Label htmlFor={`${id}-confirm-file`} className="leading-snug font-normal">
+                {t.cv.confirmFileCheckbox}
+              </Label>
+            </div>
+          ) : null}
           {state === "error" && error ? <p className="text-small text-destructive">{error}</p> : null}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={state === "saving"}>
               {t.cv.cancel}
             </Button>
-            <Button onClick={confirmPublic} disabled={!confirmed || state === "saving"}>
+            <Button onClick={confirmPublic} disabled={!confirmed || (hasFile && !confirmedFile) || state === "saving"}>
               {state === "saving" ? t.cv.saving : t.cv.confirmPublic}
             </Button>
           </DialogFooter>

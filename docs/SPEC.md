@@ -41,11 +41,16 @@ routes refuse students and reviewers (rule 10).
 | PATCH | `/api/me/open-to-work` | student | Body `{ open_to_work }`. Calls `set_open_to_work()`. |
 | GET | `/api/me/cv` | student | Own CV: `doc` (editable), `visibility`, `public_confirmed_at`, `updated_at`, `view` (full preview). `no-store`, `noindex`. |
 | PUT | `/api/me/cv` | student | Body: the whole CV (strict, section 3f). Calls `save_cv()`. 400 `invalid_body` / `invalid_cv`, 429 `rate_limited` (60 writes an hour, shared with visibility). |
-| PATCH | `/api/me/cv/visibility` | student | Body `{ visibility: "private" \| "verified" \| "public", confirm?: true }`; public needs `confirm`. Calls `set_cv_visibility()`. 400 `confirmation_required`, 429 `rate_limited`. |
+| PATCH | `/api/me/cv/visibility` | student | Body `{ visibility: "private" \| "verified" \| "public", confirm?: true, confirm_file?: true }`; public needs `confirm`, and also `confirm_file` while an uploaded CV exists. Calls `set_cv_visibility()`. 400 `confirmation_required` / `file_confirmation_required`, 429 `rate_limited`. |
+| POST | `/api/me/cv/file/upload-url` | student | Uploaded CV, step 1 (section 3g). Body `{ file_name (.pdf), size (<= 5 MB), content_type: "application/pdf", confirm_public? }`. Returns `{ upload_id, upload_url }` (one-time URL; no path field). 400 `file_type` / `file_too_large` / `file_confirmation_required`, 429 `rate_limited` (10 an hour). |
+| POST | `/api/me/cv/file` | student | Step 3: body `{ upload_id, confirm_public? }`. Downloads and screens the PDF; a refused file is deleted. Returns `{ file_name, size, uploaded_at }`. 400 `file_type`, `file_too_large`, `pdf_encrypted`, `pdf_active_content`, `pdf_unreadable`, `file_missing`, `invalid_upload`, `upload_expired`, `file_confirmation_required`. |
+| DELETE | `/api/me/cv/file` | student (any status) | Deletes the uploaded CV (row and storage object). 404 when there is none. |
+| GET | `/api/cv/:studentId/file` | any | 302 to a 60-second signed URL of the uploaded CV (`download=cv.pdf`) when `cvAccess()` allows; 404 otherwise. 30 requests / 10 min per user or hashed IP. Employer and admin downloads logged. `noindex`, `nosniff`, `no-store`, `no-referrer`. |
+| POST | `/api/admin/cv-files/cleanup` | admin | Deletes CV objects that are not a current file (unfinished uploads older than an hour, failed deletes, deleted accounts). Returns `{ removed }`; audit `admin.cv_files_cleaned`. |
 | GET | `/api/cv/:studentId` | any | One CV as the caller may see it (`cvAccess()`, section 3f). Contacts and course left out unless allowed. 404 `not_found` for everyone not allowed (same as no CV). Employer and admin views logged. `no-store`, `X-Robots-Tag: noindex`. |
 | GET | `/api/me/contact-requests` | student | Received requests (company, contact person, verified mark, message, status), pending first, plus `pending` count. |
 | PATCH | `/api/me/contact-requests/:id` | student (owner) | Body `{ action: "decline" }` or `{ action: "accept", kind: "phone" \| "telegram" \| "email", value }`. Calls `respond_contact_request()`. 404 `not_found`, 409 `already_answered`. |
-| GET | `/api/talent` | E or A | Query: `faculty_id, tier, category, page` (20 per page). Active students with `open_to_work`, in public order. Rows: `student_id, full_name, university, faculty, approved_count, tier, cv_available` (a boolean: this viewer may open the CV). No points, rank or contact. `no-store`. |
+| GET | `/api/talent` | E or A | Query: `faculty_id, tier, category, page` (20 per page). Active students with `open_to_work`, in public order. Rows: `student_id, full_name, university, faculty, approved_count, tier, cv_available, cv_file_available` (booleans: this viewer may open the CV / download the uploaded CV). No points, rank or contact. `no-store`. |
 | GET | `/api/talent/:studentId` | E or A | One open-to-work student: the same fields, approved works with `can_view_file` (rule 4) and the employer's latest request (`shared_contact` only after acceptance). Employer views are logged. 404 otherwise. |
 | GET | `/api/talent/requests` | E | The employer's sent requests. `shared_contact` only for accepted requests of active students. |
 | POST | `/api/talent/requests` | E | Body `{ student_id, message (1-500) }`. Calls `create_contact_request()`. 409 `duplicate_pending` / `already_accepted` / `declined_cooldown`, 429 `rate_limited` / `rate_limited_global`, 404 `student_not_available`, 403 `employer_profile_missing`. |
@@ -273,6 +278,39 @@ After that, further admins and reviewers are promoted on `/admin/users`.
   `employer.cv_viewed {page}` and `admin.cv_viewed {page}` (entity_id = student, every view). CVs are never sent to
   the AI model.
 - Consent v4 adds a CV paragraph (draft); the privacy policy has a "Rezyume" section.
+
+## 3g. Uploaded CV (migration `20261109000000`, CLAUDE.md rule 12)
+
+- One PDF per student next to the typed CV, in the private bucket `cvs` (bucket limits: 5 MB, `application/pdf`).
+  Object name `{student_id}/{random id}.pdf`; never the original file name, never returned in a response field (it
+  appears only inside the owner's one-time upload URL and the 60-second download URL). The original name is kept,
+  cleaned, for the owner's card only.
+- `cv_files (id, student_id, object_name, file_name, size_bytes, state pending | current | removed, created_at,
+  finalized_at, removed_at)`, at most one `current` per student. Every object ever created has a row, so the cleanup
+  needs no storage-schema access. `cv_file_access_log` is the download rate limit (rows older than a day pruned).
+- Flow (same pattern as proofs, Vercel body limit 4.5 MB): `cv_file_issue()` (active student, 10 an hour) and a
+  one-time upload URL; the browser uploads; finalize downloads the bytes and runs `screenPdf()`
+  (`src/lib/pdf-screen.ts`): <= 5 MB, starts with `%PDF-`, no `/Encrypt`, no `/JavaScript`, `/JS`, `/Launch`,
+  `/EmbeddedFile(s)`, `/OpenAction` name (whole tokens, `#xx` decoded, also inside Flate object streams). A refused
+  file is deleted (`cv_file_reject()`). `cv_file_finalize()` swaps the current file and returns the old object, which
+  the server deletes. **This is a simple screen, not a malware scanner**; the UI says so. Never sent to the AI model.
+- Access: exactly `cvAccess()` with the typed CV's `cv_visibility` (no `student_cvs` row = private); the file has no
+  "contacts" variant, so whoever may open the CV may download the whole file. Not active students: owner and admins.
+  Audit: `cv.file_uploaded {size, replaced}`, `cv.file_deleted`, `employer.cv_file_downloaded`,
+  `admin.cv_file_downloaded` (never the file name).
+- Public: `set_cv_visibility()` needs `p_confirm_file` while a file exists (the dialog's second checkbox: "The
+  uploaded file may contain phone, address or ID details. I checked it."); uploading while public needs
+  `confirm_public` (checkbox on the upload card) in step 1 and step 3. Back to private takes effect at once.
+- Cleanup (the known gap: step 2 with no step 3): `cleanupCvUploads()` deletes the objects of `pending` rows older
+  than 1 hour, of `removed` rows (failed deletes) and of deleted accounts. Run it with the button on `/admin/users`
+  (`POST /api/admin/cv-files/cleanup`) or `npm run cleanup:cv-uploads`. Rows stay `removed` for 3 hours, because
+  Supabase's signed upload URL lives 2 hours: a late upload recreates the object, and the next run deletes it again.
+  Nothing runs it on a schedule yet (no Edge Functions); run it by hand, or add a Vercel Cron with a secret later.
+- UI: `/cv` upload card (drag and drop from lg, file button, name, size, date, Replace, Delete with confirmation,
+  "Siz yukladingiz"); `/talent`, `/talent/:id` and `/cv/:id` show "Rezyumeni yuklab olish (PDF)"
+  with "talaba yuklagan, tekshirilmagan" only when allowed.
+- Consent v5 (draft) adds an uploaded-CV paragraph; the privacy policy's "Rezyume" section covers the file,
+  retention and deletion.
 
 ## 4. AI extraction (`POST /api/extract`)
 

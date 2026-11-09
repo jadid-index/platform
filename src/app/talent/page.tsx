@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { CATEGORY_ORDER, Card, CardContent, EmptyState, ErrorState, ListSkeleton, SectionHeader, TierBadge } from "@/components/ds";
+import { CvFileLink } from "@/components/cv/cv-file-link";
 import { checkTalentPage } from "@/components/talent-gate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -98,14 +99,19 @@ async function Talent({ searchParams }: { searchParams: PageProps<"/talent">["se
                       {[r.faculty, r.university].filter(Boolean).join(" · ")}
                     </p>
                     <p className="text-small text-muted-foreground">{format(t.talent.works, { n: r.approved_count })}</p>
-                    {r.cv_available ? (
-                      <Link
-                        href={`/cv/${r.student_id}`}
-                        className="inline-flex w-fit items-center gap-1.5 text-small font-medium text-primary-text underline-offset-4 hover:underline"
-                      >
-                        <FileUser className="size-4" aria-hidden />
-                        {t.talent.openCv}
-                      </Link>
+                    {r.cv_available || r.cv_file_available ? (
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        {r.cv_available ? (
+                          <Link
+                            href={`/cv/${r.student_id}`}
+                            className="inline-flex w-fit items-center gap-1.5 text-small font-medium text-primary-text underline-offset-4 hover:underline"
+                          >
+                            <FileUser className="size-4" aria-hidden />
+                            {t.talent.openCv}
+                          </Link>
+                        ) : null}
+                        {r.cv_file_available ? <CvFileLink studentId={r.student_id} size="small" /> : null}
+                      </div>
                     ) : null}
                   </div>
                 </CardContent>

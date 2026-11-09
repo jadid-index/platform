@@ -14,9 +14,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { format, t } from "@/i18n";
-import { CV_LANGUAGE_LEVELS, type CvDoc, type CvExperience, type CvLanguageLevel, type OwnCv } from "@/lib/types";
+import {
+  CV_LANGUAGE_LEVELS,
+  type CvDoc,
+  type CvExperience,
+  type CvLanguageLevel,
+  type CvVisibility,
+  type OwnCv,
+  type OwnCvFile,
+} from "@/lib/types";
 import { CV_LIMITS, charLength, currentMonthInTashkent, cvBodySchema } from "@/lib/validation";
 
+import { CvFileCard } from "./cv-file-card";
 import { CvShare } from "./cv-share";
 import { CvVisibilityControl } from "./cv-visibility";
 
@@ -70,6 +79,9 @@ export function CvEditor({ initial }: { initial: OwnCv }) {
   const [doc, setDoc] = useState<CvDoc>(initial.doc);
   const [saved, setSaved] = useState<string>(JSON.stringify(initial.doc));
   const [updatedAt, setUpdatedAt] = useState<string | null>(initial.updated_at);
+  // Shared by the visibility control and the uploaded-file card: the file follows the CV's visibility.
+  const [visibility, setVisibility] = useState<CvVisibility>(initial.visibility);
+  const [file, setFile] = useState<OwnCvFile | null>(initial.file);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [showErrors, setShowErrors] = useState(false);
@@ -183,9 +195,10 @@ export function CvEditor({ initial }: { initial: OwnCv }) {
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 lg:grid-cols-2">
-        <CvVisibilityControl initial={initial.visibility} />
+        <CvVisibilityControl initial={initial.visibility} hasFile={file !== null} onChange={setVisibility} />
         <CvShare studentId={initial.view.student_id} />
       </div>
+      <CvFileCard studentId={initial.view.student_id} initial={initial.file} visibility={visibility} onChange={setFile} />
       {/* Below lg: two tabs. From lg: both side by side (the tab bar is hidden, both panels show).
           forceMount keeps both mounted, so switching tabs never loses form state. */}
       <Tabs defaultValue="edit" className="gap-4">

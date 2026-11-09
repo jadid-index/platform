@@ -10,6 +10,7 @@ import { adminUsersQuerySchema, type AdminUsersQuery } from "@/lib/validation";
 
 import { AccountStatusChip } from "../account-status-chip";
 import { Pager } from "../pager";
+import { CvCleanup } from "./cv-cleanup";
 import { UserControls } from "./user-controls";
 import { UserFilters } from "./user-filters";
 
@@ -24,6 +25,7 @@ export default function AdminUsersPage({ searchParams }: PageProps<"/admin/users
       <Suspense fallback={<ListSkeleton rows={6} />}>
         <Users searchParams={searchParams} />
       </Suspense>
+      <CvCleanup />
     </div>
   );
 }

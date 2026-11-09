@@ -6,10 +6,12 @@ import { LoadingState } from "@/components/loading-state";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { t } from "@/i18n";
 import { loadCvForViewer } from "@/lib/cv";
+import { getCvFileOwners } from "@/lib/db";
 import { getFileViewer } from "@/lib/file-viewer";
 import type { CvView } from "@/lib/types";
 
 import { CvDocument } from "./cv-document";
+import { CvFileLink } from "./cv-file-link";
 import { CvToolbar } from "./cv-toolbar";
 
 // Shared by /cv/[studentId] and its print version. cvAccess() decides; whoever may not open the CV sees the same
@@ -25,9 +27,12 @@ export function CvPageBody({ params, print }: { params: Promise<{ studentId: str
 async function CvLoader({ params, print }: { params: Promise<{ studentId: string }>; print: boolean }) {
   const id = z.uuid().safeParse((await params).studentId);
   let cv: CvView | null = null;
+  let hasFile = false;
   if (id.success) {
     try {
       cv = await loadCvForViewer(id.data, await getFileViewer(), print ? "print" : "cv");
+      // The uploaded file follows the same access as the CV just opened, so only its existence is checked here.
+      hasFile = cv !== null && !print && (await getCvFileOwners([cv.student_id])).has(cv.student_id);
     } catch (error) {
       console.error("load cv failed", error);
       return <ErrorState message={t.cv.loadError} />;
@@ -44,6 +49,7 @@ async function CvLoader({ params, print }: { params: Promise<{ studentId: string
   return (
     <>
       <CvToolbar studentId={cv.student_id} print={print} />
+      {hasFile ? <CvFileLink studentId={cv.student_id} /> : null}
       <div
         className={
           print

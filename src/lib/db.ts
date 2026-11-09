@@ -1529,7 +1529,7 @@ function employerRequestState(r: RequestSqlRow, studentActive: boolean): Employe
 export async function getTalentStudent(
   studentId: string,
   viewer: FileViewer & { kind: "user" },
-): Promise<Omit<TalentStudent, "cv_available"> | null> {
+): Promise<Omit<TalentStudent, "cv_available" | "cv_file_available"> | null> {
   const db = getAdminClient();
   const profile = await db
     .from("profiles")
@@ -1837,7 +1837,7 @@ export function cvContacts(cv: CvRow | null): CvContacts {
 export async function getOwnCv(studentId: string): Promise<OwnCv | null> {
   const parts = await getCvParts(studentId);
   if (!parts) return null;
-  const { tier, works } = await getCvVerified(studentId);
+  const [{ tier, works }, file] = await Promise.all([getCvVerified(studentId), getCurrentCvFile(studentId)]);
   const { student, cv } = parts;
   const view: CvView = {
     student_id: student.student_id,
@@ -1857,6 +1857,7 @@ export async function getOwnCv(studentId: string): Promise<OwnCv | null> {
     public_confirmed_at: cv?.cv_public_confirmed_at ?? null,
     updated_at: cv?.updated_at ?? null,
     view,
+    file: file ? { file_name: file.file_name, size: file.size, uploaded_at: file.uploaded_at } : null,
   };
 }
 
@@ -1877,8 +1878,14 @@ export function setCvVisibility(
   studentId: string,
   visibility: CvVisibility,
   confirm: boolean,
+  confirmFile = false,
 ): Promise<CvOutcome<{ visibility: CvVisibility; public_confirmed_at: string | null }>> {
-  return cvCall("set_cv_visibility", { p_student: studentId, p_visibility: visibility, p_confirm: confirm });
+  return cvCall("set_cv_visibility", {
+    p_student: studentId,
+    p_visibility: visibility,
+    p_confirm: confirm,
+    p_confirm_file: confirmFile,
+  });
 }
 
 // Audit row for each employer or admin view of a CV. Never the CV text or contacts.
@@ -1889,6 +1896,201 @@ export async function logCvView(actorId: string, kind: "admin" | "employer", stu
     entity: "profile",
     entity_id: studentId,
     details: { page },
+  });
+  if (error) throw error;
+}
+
+// ------------------------------------------------------- uploaded CV (PDF)
+// The student's own PDF next to the typed CV (migration 20261109000000). Objects live in the private 'cvs' bucket
+// as {student_id}/{random id}.pdf; the object name stays on the server and is never put in a response body.
+
+const CV_BUCKET = "cvs";
+
+export function cvObjectName(studentId: string, fileId: string): string {
+  return `${studentId}/${fileId}.pdf`;
+}
+
+export function issueCvFile(studentId: string, fileId: string, fileName: string): Promise<CvOutcome<null>> {
+  return cvCall("cv_file_issue", {
+    p_student: studentId,
+    p_id: fileId,
+    p_object: cvObjectName(studentId, fileId),
+    p_file_name: fileName,
+  });
+}
+
+export type FinalizedCvFile = {
+  file_name: string;
+  size: number;
+  uploaded_at: string;
+  old_id: string | null;
+  old_object: string | null;
+};
+
+export function finalizeCvFile(
+  studentId: string,
+  fileId: string,
+  size: number,
+  confirmPublic: boolean,
+): Promise<CvOutcome<FinalizedCvFile>> {
+  return cvCall("cv_file_finalize", { p_student: studentId, p_id: fileId, p_size: size, p_confirm_public: confirmPublic });
+}
+
+export async function rejectCvFile(studentId: string, fileId: string): Promise<void> {
+  const { error } = await getAdminClient().rpc("cv_file_reject", { p_student: studentId, p_id: fileId });
+  if (error) throw error;
+}
+
+export async function removeCvFileRow(studentId: string): Promise<{ id: string; object: string } | null> {
+  const { data, error } = await getAdminClient().rpc("cv_file_remove", { p_student: studentId });
+  if (error) throw error;
+  return (data as { id: string; object: string } | null) ?? null;
+}
+
+export async function forgetCvFile(fileId: string): Promise<void> {
+  const { error } = await getAdminClient().rpc("cv_file_forget", { p_id: fileId });
+  if (error) throw error;
+}
+
+export async function staleCvFiles(olderThanMinutes: number, limit = 500): Promise<{ id: string; object_name: string }[]> {
+  const { data, error } = await getAdminClient().rpc("cv_file_stale", {
+    p_older_than: `${olderThanMinutes} minutes`,
+    p_limit: limit,
+  });
+  if (error) throw error;
+  return (data ?? []) as { id: string; object_name: string }[];
+}
+
+// A pending upload of this student (for finalize): server only, carries the object name.
+export async function getPendingCvFile(
+  studentId: string,
+  fileId: string,
+): Promise<{ id: string; object_name: string; created_at: string } | null> {
+  const { data, error } = await getAdminClient()
+    .from("cv_files")
+    .select("id, object_name, created_at")
+    .eq("id", fileId)
+    .eq("student_id", studentId)
+    .eq("state", "pending")
+    .maybeSingle<{ id: string; object_name: string; created_at: string }>();
+  if (error) throw error;
+  return data ?? null;
+}
+
+// The student's current uploaded CV. Server only: object_name must never leave the server.
+export type CurrentCvFile = { id: string; object_name: string; file_name: string; size: number; uploaded_at: string };
+
+export async function getCurrentCvFile(studentId: string): Promise<CurrentCvFile | null> {
+  const { data, error } = await getAdminClient()
+    .from("cv_files")
+    .select("id, object_name, file_name, size_bytes, finalized_at")
+    .eq("student_id", studentId)
+    .eq("state", "current")
+    .maybeSingle<{ id: string; object_name: string; file_name: string; size_bytes: number; finalized_at: string }>();
+  if (error) throw error;
+  if (!data) return null;
+  return { id: data.id, object_name: data.object_name, file_name: data.file_name, size: data.size_bytes, uploaded_at: data.finalized_at };
+}
+
+// Which of these students have an uploaded CV (for /talent; booleans only).
+export async function getCvFileOwners(studentIds: string[]): Promise<Set<string>> {
+  if (studentIds.length === 0) return new Set();
+  const { data, error } = await getAdminClient()
+    .from("cv_files")
+    .select("student_id")
+    .eq("state", "current")
+    .in("student_id", studentIds);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.student_id as string));
+}
+
+// The visibility of the typed CV, which the uploaded file shares. No row = private.
+export async function getCvVisibility(studentId: string): Promise<CvVisibility> {
+  const { data, error } = await getAdminClient()
+    .from("student_cvs")
+    .select("cv_visibility")
+    .eq("student_id", studentId)
+    .maybeSingle<{ cv_visibility: CvVisibility }>();
+  if (error) throw error;
+  return data?.cv_visibility ?? "private";
+}
+
+export async function createCvUploadUrl(objectName: string): Promise<string> {
+  const { data, error } = await getAdminClient().storage.from(CV_BUCKET).createSignedUploadUrl(objectName);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function downloadCvObject(objectName: string): Promise<Blob | null> {
+  const { data, error } = await getAdminClient().storage.from(CV_BUCKET).download(objectName);
+  if (error) {
+    if ("status" in error && (error.status === 400 || error.status === 404)) return null;
+    throw error;
+  }
+  return data;
+}
+
+// Short-lived read URL, served as a download under a neutral name (never the student's file name).
+export async function createCvReadUrl(objectName: string, expiresInSeconds: number): Promise<string> {
+  const { data, error } = await getAdminClient()
+    .storage.from(CV_BUCKET)
+    .createSignedUrl(objectName, expiresInSeconds, { download: "cv.pdf" });
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+// Returns false when the delete failed; the row then stays 'removed' and the cleanup tries again.
+export async function deleteCvObjects(objectNames: string[]): Promise<boolean> {
+  if (objectNames.length === 0) return true;
+  const { error } = await getAdminClient().storage.from(CV_BUCKET).remove(objectNames);
+  if (error) {
+    console.error("delete cv objects failed", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function countCvFileAccessSince(clientKey: string, sinceIso: string): Promise<number> {
+  const { count, error } = await getAdminClient()
+    .from("cv_file_access_log")
+    .select("id", { count: "exact", head: true })
+    .eq("client_key", clientKey)
+    .gte("created_at", sinceIso);
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function logCvFileAccess(
+  entry: { student_id: string; viewer_id: string | null; client_key: string },
+  now: Date = new Date(),
+): Promise<void> {
+  const db = getAdminClient();
+  const { error } = await db.from("cv_file_access_log").insert(entry);
+  if (error) throw error;
+  const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const { error: pruneError } = await db.from("cv_file_access_log").delete().lt("created_at", dayAgo);
+  if (pruneError) throw pruneError;
+}
+
+// Audit row for each employer or admin download of an uploaded CV.
+export async function logCvFileDownload(actorId: string, kind: "admin" | "employer", studentId: string): Promise<void> {
+  const { error } = await getAdminClient().from("audit_log").insert({
+    actor_id: actorId,
+    action: kind === "admin" ? "admin.cv_file_downloaded" : "employer.cv_file_downloaded",
+    entity: "profile",
+    entity_id: studentId,
+    details: {},
+  });
+  if (error) throw error;
+}
+
+export async function logAdminCvCleanup(actorId: string, removed: number): Promise<void> {
+  const { error } = await getAdminClient().from("audit_log").insert({
+    actor_id: actorId,
+    action: "admin.cv_files_cleaned",
+    entity: "storage",
+    entity_id: "cvs",
+    details: { removed },
   });
   if (error) throw error;
 }

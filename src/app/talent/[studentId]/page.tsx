@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { z } from "zod";
 
 import { Card, CardContent, CardHeader, CardTitle, EmptyState, ErrorState, SectionHeader, TierBadge } from "@/components/ds";
+import { CvFileLink } from "@/components/cv/cv-file-link";
 import { LoadingState } from "@/components/loading-state";
 import { checkTalentPage } from "@/components/talent-gate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -68,14 +69,19 @@ async function StudentLoader({ params }: { params: PageProps<"/talent/[studentId
             <h1 className="text-h2 break-words">{student.full_name}</h1>
             <p className="text-sm text-muted-foreground">{[student.faculty, student.university].filter(Boolean).join(" · ")}</p>
             <p className="text-sm text-muted-foreground">{format(t.talent.works, { n: student.approved_count })}</p>
-            {student.cv_available ? (
-              <Link
-                href={`/cv/${student.student_id}`}
-                className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-              >
-                <FileUser className="size-4" aria-hidden />
-                {t.talent.openCv}
-              </Link>
+            {student.cv_available || student.cv_file_available ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {student.cv_available ? (
+                  <Link
+                    href={`/cv/${student.student_id}`}
+                    className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+                  >
+                    <FileUser className="size-4" aria-hidden />
+                    {t.talent.openCv}
+                  </Link>
+                ) : null}
+                {student.cv_file_available ? <CvFileLink studentId={student.student_id} size="sm" /> : null}
+              </div>
             ) : null}
           </div>
         </CardContent>

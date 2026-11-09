@@ -203,8 +203,9 @@ export type TalentRow = {
   tier: PublicTier | null; // all-time: the best academic year
 };
 
-// cv_available: this viewer may open the student's CV (cvAccess(), rule 12). A boolean only, never CV data.
-export type TalentListRow = TalentRow & { cv_available: boolean };
+// cv_available: this viewer may open the student's CV (cvAccess(), rule 12); cv_file_available: the student uploaded
+// a CV file and this viewer may download it (same rule). Booleans only, never CV data.
+export type TalentListRow = TalentRow & { cv_available: boolean; cv_file_available: boolean };
 export type TalentPage<R = TalentRow> = { rows: R[]; total: number; page: number; page_size: number };
 export type TalentList = TalentPage<TalentListRow>;
 
@@ -229,6 +230,7 @@ export type TalentStudent = Omit<TalentRow, "approved_count"> & {
   works: TalentWork[];
   request: EmployerRequestState | null; // the latest request of this employer, if any
   cv_available: boolean;
+  cv_file_available: boolean;
 };
 
 export type EmployerSentRequest = EmployerRequestState & {
@@ -309,4 +311,8 @@ export type OwnCv = {
   public_confirmed_at: string | null;
   updated_at: string | null;
   view: CvView; // the full CV, for the live preview
+  file: OwnCvFile | null; // the uploaded CV, if any
 };
+
+// The owner's uploaded CV: what the /cv card shows. Never the storage object name.
+export type OwnCvFile = { file_name: string; size: number; uploaded_at: string };

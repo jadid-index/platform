@@ -21,11 +21,14 @@ async function withVerified(viewer: TalentViewer) {
   return { ...viewer, verifiedEmployer: viewer.role === "employer" ? await isVerifiedEmployer(viewer.userId) : false };
 }
 
-// One page of the directory, with whether this viewer may open each student's CV ("Open CV" link).
+// One page of the directory, with whether this viewer may open each student's CV ("Open CV") and uploaded CV file.
 export async function loadTalentList(viewer: TalentViewer, query: TalentQuery): Promise<TalentList> {
   const [page, v] = await Promise.all([listTalent(query), withVerified(viewer)]);
-  const cv = await cvAvailableFor(v, page.rows.map((r) => r.student_id));
-  return { ...page, rows: page.rows.map((r) => ({ ...r, cv_available: cv.has(r.student_id) })) };
+  const { cv, file } = await cvAvailableFor(v, page.rows.map((r) => r.student_id));
+  return {
+    ...page,
+    rows: page.rows.map((r) => ({ ...r, cv_available: cv.has(r.student_id), cv_file_available: file.has(r.student_id) })),
+  };
 }
 
 // One student of the directory for an active employer or admin, shared by GET /api/talent/:id and /talent/[studentId].
@@ -42,8 +45,8 @@ export async function loadTalentStudent(viewer: TalentViewer, studentId: string)
   const student = await getTalentStudent(studentId, fileViewer);
   if (!student) return null;
   if (viewer.role === "employer") await logEmployerProfileView(viewer.userId, studentId, "talent");
-  const cv = await cvAvailableFor(v, [studentId]);
-  return { ...student, cv_available: cv.has(studentId) };
+  const { cv, file } = await cvAvailableFor(v, [studentId]);
+  return { ...student, cv_available: cv.has(studentId), cv_file_available: file.has(studentId) };
 }
 
 export { requireTalentViewer };

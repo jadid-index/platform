@@ -315,8 +315,23 @@ async function removeTestUsers(prefix?: string): Promise<number> {
   }
   for (let i = 0; i < paths.length; i += 500) await db.storage.from("proofs").remove(paths.slice(i, i + 500));
 
+  // Uploaded CVs: every object has a cv_files row ({student_id}/{id}.pdf); also any leftover in the student folders.
+  const cvPaths = new Set<string>();
+  const { data: cvRows, error: cvRowsError } = await db.from("cv_files").select("object_name").in("student_id", ids);
+  if (cvRowsError) throw cvRowsError;
+  for (const r of cvRows ?? []) cvPaths.add(r.object_name as string);
+  for (const id of ids) {
+    const { data: files } = await db.storage.from("cvs").list(id, { limit: 1000 });
+    for (const f of files ?? []) cvPaths.add(`${id}/${f.name}`);
+  }
+  const cvList = [...cvPaths];
+  for (let i = 0; i < cvList.length; i += 500) await db.storage.from("cvs").remove(cvList.slice(i, i + 500));
+
   const steps = [
     db.from("file_access_log").delete().in("viewer_id", ids),
+    db.from("cv_files").delete().in("student_id", ids),
+    db.from("cv_file_access_log").delete().in("viewer_id", ids),
+    db.from("cv_file_access_log").delete().in("student_id", ids),
     // Route scans call /api/files with user ids as the submission id.
     db.from("file_access_log").delete().in("submission_id", ids),
     ...(subIds.length ? [db.from("file_access_log").delete().in("submission_id", subIds)] : []),

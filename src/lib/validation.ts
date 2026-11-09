@@ -198,18 +198,61 @@ export const cvBodySchema = z.strictObject({
 });
 export type CvBody = z.infer<typeof cvBodySchema>;
 
+// confirm_file: the second checkbox of the dialog ("the uploaded file may contain phone, address or ID details"),
+// required by set_cv_visibility() only when the student has an uploaded CV.
 export const cvVisibilityBodySchema = z
-  .strictObject({ visibility: z.enum(CV_VISIBILITIES), confirm: z.literal(true).optional() })
+  .strictObject({
+    visibility: z.enum(CV_VISIBILITIES),
+    confirm: z.literal(true).optional(),
+    confirm_file: z.literal(true).optional(),
+  })
   .refine((b) => b.visibility !== "public" || b.confirm === true, { path: ["confirm"], message: "confirmation_required" });
 export type CvVisibilityBody = z.infer<typeof cvVisibilityBodySchema>;
 
-// Exceptions raised by save_cv() / set_cv_visibility().
+// Exceptions raised by save_cv() / set_cv_visibility() and the cv_file_* functions.
 export const CV_ERRORS: Record<string, number> = {
   not_active_student: 403,
   invalid_cv: 400,
+  invalid_body: 400,
   rate_limited: 429,
   confirmation_required: 400,
+  file_confirmation_required: 400,
+  invalid_upload: 400,
+  upload_expired: 400,
+  file_too_large: 400,
 };
+
+// ---------------------------------------------------------- uploaded CV
+
+export const CV_FILE_MAX_BYTES = 5 * 1024 * 1024;
+
+// Step 1 of the uploaded CV: the declared name, size and type. The real bytes are checked in step 3.
+// confirm_public: while the CV is public, the student confirmed the file may be seen by anyone.
+export const cvFileUploadUrlBodySchema = z.strictObject({
+  file_name: z
+    .string()
+    .trim()
+    .min(5)
+    .max(255)
+    .refine((n) => n.toLowerCase().endsWith(".pdf"), { message: "file_type" }),
+  size: z.number().int().positive().max(CV_FILE_MAX_BYTES),
+  content_type: z.literal("application/pdf"),
+  confirm_public: z.literal(true).optional(),
+});
+export type CvFileUploadUrlBody = z.infer<typeof cvFileUploadUrlBodySchema>;
+
+export const cvFileFinalizeBodySchema = z.strictObject({
+  upload_id: z.uuid(),
+  confirm_public: z.literal(true).optional(),
+});
+export type CvFileFinalizeBody = z.infer<typeof cvFileFinalizeBodySchema>;
+
+// The file name as shown to its owner: no control or bidi characters, at most 120 characters, keeps ".pdf".
+export function cvDisplayFileName(name: string): string {
+  const clean = name.normalize("NFC").replace(/[\p{Cc}\p{Cf}]/gu, "").replace(/[\\/]/g, "_").trim();
+  const base = clean.replace(/\.pdf$/i, "").slice(0, 110).trim() || "cv";
+  return `${base}.pdf`;
+}
 
 // ---------------------------------------------------------------- submissions
 
